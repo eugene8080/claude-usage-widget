@@ -54,6 +54,17 @@ class Storage private constructor(
         get() = snapshot.getLong("wk_reset", 0L)
         set(v) = snapshot.edit().putLong("wk_reset", v).apply()
 
+    /** Weekly Fable window; -1 means the endpoint didn't report one for this plan. */
+    var fableUtil: Float
+        get() = snapshot.getFloat("fb_util", -1f)
+        set(v) = snapshot.edit().putFloat("fb_util", v).apply()
+
+    var fableReset: Long
+        get() = snapshot.getLong("fb_reset", 0L)
+        set(v) = snapshot.edit().putLong("fb_reset", v).apply()
+
+    val hasFable: Boolean get() = fableUtil >= 0f
+
     var fetchedAt: Long
         get() = snapshot.getLong("fetched_at", 0L)
         set(v) = snapshot.edit().putLong("fetched_at", v).apply()
@@ -71,6 +82,9 @@ class Storage private constructor(
             .putLong("fh_reset", s.fiveHour.resetsAtEpochMs)
             .putFloat("wk_util", s.sevenDay.utilization)
             .putLong("wk_reset", s.sevenDay.resetsAtEpochMs)
+            // Write -1 when absent so a plan that loses the Fable window stops showing a stale row.
+            .putFloat("fb_util", s.sevenDayFable?.utilization ?: -1f)
+            .putLong("fb_reset", s.sevenDayFable?.resetsAtEpochMs ?: 0L)
             .putLong("fetched_at", s.fetchedAtEpochMs)
             .apply()
     }

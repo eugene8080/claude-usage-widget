@@ -15,11 +15,13 @@ import kotlin.math.roundToInt
 
 class UsageWidget : GlanceAppWidget() {
 
-    // Two reusable buckets; Glance maps any real size to the nearest one.
+    // Reusable buckets; Glance maps any real size to the nearest one.
     override val sizeMode = SizeMode.Responsive(
         setOf(
-            DpSize(60.dp, 60.dp),    // Compact (~1x1)
-            DpSize(180.dp, 110.dp),  // Full
+            DpSize(60.dp, 60.dp),    // Compact (~1x1), three mini meters
+            DpSize(60.dp, 110.dp),   // Compact + Claude mark
+            DpSize(180.dp, 110.dp),  // Full, three meters only
+            DpSize(180.dp, 150.dp),  // Full + Claude mark and title
         )
     )
 
@@ -41,6 +43,9 @@ class UsageWidget : GlanceAppWidget() {
             fiveHourResets = TimeFmt.resetsIn(s.fiveHourReset, now),
             sevenDayPct = s.sevenDayUtil.coerceAtLeast(0f).roundToInt(),
             sevenDayResets = TimeFmt.resetsIn(s.sevenDayReset, now),
+            hasFable = s.hasFable,
+            fablePct = s.fableUtil.coerceAtLeast(0f).roundToInt(),
+            fableResets = TimeFmt.resetsIn(s.fableReset, now),
             stale = TimeFmt.isStale(s.fetchedAt, now),
         )
     }

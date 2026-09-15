@@ -1,0 +1,30 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+
+    <!--
+      Claude's starburst mark: twelve tapered rays around a solid core.
+      Hand-drawn approximation of the official logo (we can't vendor the
+      trademarked asset), tinted with @color/accent so it follows the same
+      light/dark palette as the usage bars.
+    -->
+    <path android:fillColor="@color/accent" android:pathData="M22.05,22.40 L23.40,2.50 L24.60,2.50 L25.95,22.40 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M23.11,21.64 L34.23,5.08 L35.27,5.68 L26.49,23.59 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M24.41,21.51 L42.32,12.73 L42.92,13.77 L26.36,24.89 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M25.60,22.05 L45.50,23.40 L45.50,24.60 L25.60,25.95 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M26.36,23.11 L42.92,34.23 L42.32,35.27 L24.41,26.49 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M26.49,24.41 L35.27,42.32 L34.23,42.92 L23.11,26.36 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M25.95,25.60 L24.60,45.50 L23.40,45.50 L22.05,25.60 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M24.89,26.36 L13.77,42.92 L12.73,42.32 L21.51,24.41 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M23.59,26.49 L5.68,35.27 L5.08,34.23 L21.64,23.11 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M22.40,25.95 L2.50,24.60 L2.50,23.40 L22.40,22.05 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M21.64,24.89 L5.08,13.77 L5.68,12.73 L23.59,21.51 Z" />
+    <path android:fillColor="@color/accent" android:pathData="M21.51,23.59 L12.73,5.68 L13.77,5.08 L24.89,21.64 Z" />
+
+    <!-- Core that fuses the twelve ray roots into one solid centre. -->
+    <path
+        android:fillColor="@color/accent"
+        android:pathData="M24,21.7 A2.3,2.3 0 1,1 24,26.3 A2.3,2.3 0 1,1 24,21.7 Z" />
+</vector>
