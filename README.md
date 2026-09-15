@@ -1,9 +1,9 @@
 <div align="center">
 
-# 🦞 Claude Usage Widget
+# ✳️ Claude Usage Widget
 
 **An Android home-screen widget for your Claude subscription usage.**
-Keeps your `5H` and `1W` percentages (plus *“resets in”* countdowns) live on your home screen.
+Keeps your `5H`, `1W` and `1W Fable` percentages (plus *“resets in”* countdowns) live on your home screen.
 
 ![status: working](https://img.shields.io/badge/status-working-brightgreen)
 ![platform: Android 8+](https://img.shields.io/badge/platform-Android%208%2B-3DDC84?logo=android&logoColor=white)
@@ -11,7 +11,7 @@ Keeps your `5H` and `1W` percentages (plus *“resets in”* countdowns) live on
 
 <br />
 
-<img src="docs/promo.png" alt="Claude Usage widget on an Android home screen, with a close-up of the 5H and 1W usage bars" width="720" />
+<img src="docs/promo.png" alt="Claude Usage widget on an Android home screen, with a close-up of the usage bars" width="720" />
 
 <br />
 
@@ -36,7 +36,7 @@ Then continue with first-run setup below.
 ## 👋 First-run setup
 
 1. Open the **Claude Usage** app and tap **Sign in**, then complete the normal `claude.ai` login in the WebView. It closes automatically once it captures your session.
-2. Tap **Test fetch now** to confirm it prints your current `5H` and `1W` percentages. These should match `claude.ai/settings/usage`.
+2. Tap **Test fetch now** to confirm it prints your current `5H`, `1W` and `1W Fable` percentages. These should match `claude.ai/settings/usage`.
 3. Tap **Disable battery optimization** and allow it, so Android doesn't kill the 15-minute background refresh.
 4. Long-press your home screen → **Widgets** → **Claude Usage**, drag it on, and resize it however you like. Tap it any time to refresh.
 
@@ -53,16 +53,16 @@ Anthropic provides no public API for subscription (Pro/Max) usage. This widget r
 
 ## ✨ Highlights
 
-- **Two rolling windows at a glance.** The 5-hour and 1-week usage percentages, with a live countdown to each reset.
+- **Every rolling window at a glance.** The 5-hour and 1-week usage percentages plus the separate per-model weekly cap — `1W Fable` today — each with a live countdown to its reset. The model name comes from the endpoint, and the row hides itself on accounts that aren't metered one.
 - **Refreshes itself.** A background job updates every ~15 minutes; tap the widget to force an immediate refresh.
 - **Sign in once.** A single `claude.ai` login; you only re-authenticate when the long-lived session finally expires (weeks).
 - **Resizes freely.** Snaps between a compact and a full layout, and adapts to light & dark themes.
 
 ## 🛠 How it works
 
-You log in once through a real `claude.ai` WebView. The app harvests the `sessionKey` and `cf_clearance` cookies plus the WebView User-Agent, stores them encrypted on-device, and fetches usage headlessly with `OkHttp`. When a headless fetch hits Cloudflare's challenge, the app silently re-solves it in an off-screen WebView (no interaction needed while `sessionKey` is valid) and retries. A `WorkManager` job refreshes every ~15 minutes. You only sign in again when the long-lived `sessionKey` itself expires, at which point the widget shows a *“Tap to sign in”* state.
+You log in once through a real `claude.ai` WebView. The app harvests the `sessionKey` and `cf_clearance` cookies plus the WebView User-Agent, stores them encrypted on-device, and fetches usage headlessly with `OkHttp`. The endpoint serves two payload shapes — a modern top-level `limits[]` array of `{kind, percent, resets_at, scope}` entries, and the older fixed `five_hour` / `seven_day` / `seven_day_<model>` keys — and the parser reads whichever one it gets. When a headless fetch hits Cloudflare's challenge, the app silently re-solves it in an off-screen WebView (no interaction needed while `sessionKey` is valid) and retries. A `WorkManager` job refreshes every ~15 minutes. You only sign in again when the long-lived `sessionKey` itself expires, at which point the widget shows a *“Tap to sign in”* state.
 
-The widget snaps between a **Compact** layout (mascot + two mini bars + percentages) and a **Full** layout (mascot + label + two bars with percentage and *“resets in”* for each). Both adapt to light and dark themes, and a small amber dot appears when the numbers are stale.
+The widget snaps between a **Compact** layout (mini bars + percentages) and a **Full** layout (label + bars with percentage and *“resets in”* for each). The Claude mark and title appear once the widget is tall enough to fit them, and *“resets in”* shortens to a bare countdown on narrow widgets. Both layouts adapt to light and dark themes, and a small amber dot appears when the numbers are stale.
 
 ## 🔒 Security notes
 

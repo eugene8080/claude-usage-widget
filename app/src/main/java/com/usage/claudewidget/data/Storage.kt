@@ -54,6 +54,22 @@ class Storage private constructor(
         get() = snapshot.getLong("wk_reset", 0L)
         set(v) = snapshot.edit().putLong("wk_reset", v).apply()
 
+    /** Per-model weekly window; -1 means the endpoint reported none for this account. */
+    var modelWeeklyUtil: Float
+        get() = snapshot.getFloat("mw_util", -1f)
+        set(v) = snapshot.edit().putFloat("mw_util", v).apply()
+
+    var modelWeeklyReset: Long
+        get() = snapshot.getLong("mw_reset", 0L)
+        set(v) = snapshot.edit().putLong("mw_reset", v).apply()
+
+    /** The model the endpoint named for that window, e.g. "Fable". */
+    var modelWeeklyName: String
+        get() = snapshot.getString("mw_name", "").orEmpty()
+        set(v) = snapshot.edit().putString("mw_name", v).apply()
+
+    val hasModelWeekly: Boolean get() = modelWeeklyUtil >= 0f && modelWeeklyName.isNotBlank()
+
     var fetchedAt: Long
         get() = snapshot.getLong("fetched_at", 0L)
         set(v) = snapshot.edit().putLong("fetched_at", v).apply()
@@ -71,6 +87,11 @@ class Storage private constructor(
             .putLong("fh_reset", s.fiveHour.resetsAtEpochMs)
             .putFloat("wk_util", s.sevenDay.utilization)
             .putLong("wk_reset", s.sevenDay.resetsAtEpochMs)
+            // Write -1 when absent so an account that loses the per-model window stops
+            // showing a stale row.
+            .putFloat("mw_util", s.modelWeekly?.window?.utilization ?: -1f)
+            .putLong("mw_reset", s.modelWeekly?.window?.resetsAtEpochMs ?: 0L)
+            .putString("mw_name", s.modelWeekly?.modelName.orEmpty())
             .putLong("fetched_at", s.fetchedAtEpochMs)
             .apply()
     }
