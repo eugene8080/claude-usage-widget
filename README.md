@@ -37,8 +37,11 @@ change that hasn't been tagged yet.</sub>
 > Why the warnings? The APK is sideloaded rather than shipped through the Play Store, so Android plays it safe. It's the normal two-tap detour for any direct APK.
 
 > **Replacing an existing install?** Android refuses to install over an APK signed with a
-> different key, so switching between builds from different sources needs an uninstall
-> first. That clears the stored session, so you sign in to Claude again afterwards.
+> different key. With the signing secrets below configured every build is signed with the
+> same key and updates install straight over one another; without them AGP generates a
+> per-machine debug key, and since a CI runner is a new machine every run, each build gets
+> a different one and every update needs an uninstall first. Uninstalling clears the stored
+> session, so you sign in to Claude again afterwards.
 
 Then continue with first-run setup below.
 
