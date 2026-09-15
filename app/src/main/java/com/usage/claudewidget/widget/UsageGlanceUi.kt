@@ -42,10 +42,12 @@ data class WidgetState(
     val fiveHourResets: String,
     val sevenDayPct: Int,
     val sevenDayResets: String,
-    /** False when the endpoint reports no weekly Fable cap for this plan; the row is then hidden. */
-    val hasFable: Boolean,
-    val fablePct: Int,
-    val fableResets: String,
+    /** False when the endpoint reports no per-model weekly cap; the row is then hidden. */
+    val hasModelWeekly: Boolean,
+    /** The model that window is scoped to, as the endpoint names it (e.g. "Fable"). */
+    val modelWeeklyName: String,
+    val modelWeeklyPct: Int,
+    val modelWeeklyResets: String,
     val stale: Boolean,
 )
 
@@ -114,9 +116,9 @@ private fun FullLayout(s: WidgetState, showMark: Boolean, showResetPrefix: Boole
         MeterRow("5H", s.fiveHourPct, s.fiveHourResets, showResetPrefix)
         Spacer(GlanceModifier.height(6.dp))
         MeterRow("1W", s.sevenDayPct, s.sevenDayResets, showResetPrefix)
-        if (s.hasFable) {
+        if (s.hasModelWeekly) {
             Spacer(GlanceModifier.height(6.dp))
-            MeterRow("1W Fable", s.fablePct, s.fableResets, showResetPrefix)
+            MeterRow("1W ${s.modelWeeklyName}", s.modelWeeklyPct, s.modelWeeklyResets, showResetPrefix)
         }
     }
 }
@@ -170,9 +172,9 @@ private fun CompactLayout(s: WidgetState, showMark: Boolean) {
         CompactMeter("5H", s.fiveHourPct)
         Spacer(GlanceModifier.height(4.dp))
         CompactMeter("1W", s.sevenDayPct)
-        if (s.hasFable) {
+        if (s.hasModelWeekly) {
             Spacer(GlanceModifier.height(4.dp))
-            CompactMeter("Fable", s.fablePct)
+            CompactMeter(s.modelWeeklyName, s.modelWeeklyPct)
         }
     }
 }

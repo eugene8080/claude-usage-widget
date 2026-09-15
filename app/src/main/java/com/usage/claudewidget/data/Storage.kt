@@ -54,16 +54,21 @@ class Storage private constructor(
         get() = snapshot.getLong("wk_reset", 0L)
         set(v) = snapshot.edit().putLong("wk_reset", v).apply()
 
-    /** Weekly Fable window; -1 means the endpoint didn't report one for this plan. */
-    var fableUtil: Float
-        get() = snapshot.getFloat("fb_util", -1f)
-        set(v) = snapshot.edit().putFloat("fb_util", v).apply()
+    /** Per-model weekly window; -1 means the endpoint reported none for this account. */
+    var modelWeeklyUtil: Float
+        get() = snapshot.getFloat("mw_util", -1f)
+        set(v) = snapshot.edit().putFloat("mw_util", v).apply()
 
-    var fableReset: Long
-        get() = snapshot.getLong("fb_reset", 0L)
-        set(v) = snapshot.edit().putLong("fb_reset", v).apply()
+    var modelWeeklyReset: Long
+        get() = snapshot.getLong("mw_reset", 0L)
+        set(v) = snapshot.edit().putLong("mw_reset", v).apply()
 
-    val hasFable: Boolean get() = fableUtil >= 0f
+    /** The model the endpoint named for that window, e.g. "Fable". */
+    var modelWeeklyName: String
+        get() = snapshot.getString("mw_name", "").orEmpty()
+        set(v) = snapshot.edit().putString("mw_name", v).apply()
+
+    val hasModelWeekly: Boolean get() = modelWeeklyUtil >= 0f && modelWeeklyName.isNotBlank()
 
     var fetchedAt: Long
         get() = snapshot.getLong("fetched_at", 0L)
@@ -82,9 +87,11 @@ class Storage private constructor(
             .putLong("fh_reset", s.fiveHour.resetsAtEpochMs)
             .putFloat("wk_util", s.sevenDay.utilization)
             .putLong("wk_reset", s.sevenDay.resetsAtEpochMs)
-            // Write -1 when absent so a plan that loses the Fable window stops showing a stale row.
-            .putFloat("fb_util", s.sevenDayFable?.utilization ?: -1f)
-            .putLong("fb_reset", s.sevenDayFable?.resetsAtEpochMs ?: 0L)
+            // Write -1 when absent so an account that loses the per-model window stops
+            // showing a stale row.
+            .putFloat("mw_util", s.modelWeekly?.window?.utilization ?: -1f)
+            .putLong("mw_reset", s.modelWeekly?.window?.resetsAtEpochMs ?: 0L)
+            .putString("mw_name", s.modelWeekly?.modelName.orEmpty())
             .putLong("fetched_at", s.fetchedAtEpochMs)
             .apply()
     }

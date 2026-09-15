@@ -43,9 +43,10 @@ class UsageWidget : GlanceAppWidget() {
             fiveHourResets = TimeFmt.resetsIn(s.fiveHourReset, now),
             sevenDayPct = s.sevenDayUtil.coerceAtLeast(0f).roundToInt(),
             sevenDayResets = TimeFmt.resetsIn(s.sevenDayReset, now),
-            hasFable = s.hasFable,
-            fablePct = s.fableUtil.coerceAtLeast(0f).roundToInt(),
-            fableResets = TimeFmt.resetsIn(s.fableReset, now),
+            hasModelWeekly = s.hasModelWeekly,
+            modelWeeklyName = s.modelWeeklyName,
+            modelWeeklyPct = s.modelWeeklyUtil.coerceAtLeast(0f).roundToInt(),
+            modelWeeklyResets = TimeFmt.resetsIn(s.modelWeeklyReset, now),
             stale = TimeFmt.isStale(s.fetchedAt, now),
         )
     }

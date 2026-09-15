@@ -82,8 +82,8 @@ private fun SetupScreen() {
                         buildString {
                             append("5H: ${r.snapshot.fiveHour.utilization}%   ")
                             append("1W: ${r.snapshot.sevenDay.utilization}%")
-                            r.snapshot.sevenDayFable?.let {
-                                append("   1W Fable: ${it.utilization}%")
+                            r.snapshot.modelWeekly?.let {
+                                append("   1W ${it.modelName}: ${it.window.utilization}%")
                             }
                         }
                     }
@@ -110,7 +110,10 @@ private fun describe(s: Storage): String = buildString {
     if (s.hasSnapshot) {
         append("\nlast: 5H ").append(s.fiveHourUtil.toInt()).append("%  1W ")
             .append(s.sevenDayUtil.toInt()).append("%")
-        if (s.hasFable) append("  1W Fable ").append(s.fableUtil.toInt()).append("%")
+        if (s.hasModelWeekly) {
+            append("  1W ").append(s.modelWeeklyName).append(" ")
+                .append(s.modelWeeklyUtil.toInt()).append("%")
+        }
     }
 }
 
