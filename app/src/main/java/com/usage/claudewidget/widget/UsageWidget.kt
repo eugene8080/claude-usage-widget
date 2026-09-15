@@ -20,6 +20,7 @@ class UsageWidget : GlanceAppWidget() {
         setOf(
             DpSize(60.dp, 60.dp),    // Compact (~1x1), three mini meters
             DpSize(60.dp, 110.dp),   // Compact + Claude mark
+            DpSize(140.dp, 50.dp),   // One row tall (~1x2 and 1x3), meters side by side
             DpSize(180.dp, 110.dp),  // Full, three meters only
             DpSize(180.dp, 150.dp),  // Full + Claude mark and title
         )

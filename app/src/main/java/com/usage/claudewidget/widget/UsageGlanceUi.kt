@@ -52,6 +52,11 @@ data class WidgetState(
 )
 
 private val COMPACT_MAX_WIDTH = 130.dp
+/**
+ * One home-screen row leaves no room to stack three meters, so a wide-but-short
+ * widget sets them side by side instead of clipping the last one off the bottom.
+ */
+private val SHORT_MAX_HEIGHT = 80.dp
 /** Heights below which three meters leave no room for the Claude mark above them. */
 private val FULL_MARK_MIN_HEIGHT = 130.dp
 private val COMPACT_MARK_MIN_HEIGHT = 100.dp
@@ -66,6 +71,7 @@ private fun barTrack() = ColorProvider(R.color.bar_track)
 fun UsageWidgetContent(state: WidgetState) {
     val size = LocalSize.current
     val compact = size.width < COMPACT_MAX_WIDTH
+    val short = !compact && size.height < SHORT_MAX_HEIGHT
     val context = LocalContext.current
 
     val tap = if (state.needsLogin) {
@@ -79,12 +85,13 @@ fun UsageWidgetContent(state: WidgetState) {
             .fillMaxSize()
             .background(GlanceTheme.colors.widgetBackground)
             .cornerRadius(20.dp)
-            .padding(if (compact) 8.dp else 10.dp)
+            .padding(if (short) 6.dp else if (compact) 8.dp else 10.dp)
             .clickable(tap),
     ) {
         when {
             state.needsLogin -> SignInPrompt(compact)
             !state.hasData -> Loading(compact)
+            short -> ShortLayout(state)
             compact -> CompactLayout(state, showMark = size.height >= COMPACT_MARK_MIN_HEIGHT)
             else -> FullLayout(
                 state,
@@ -120,6 +127,52 @@ private fun FullLayout(s: WidgetState, showMark: Boolean, showResetPrefix: Boole
             Spacer(GlanceModifier.height(6.dp))
             MeterRow("1W ${s.modelWeeklyName}", s.modelWeeklyPct, s.modelWeeklyResets, showResetPrefix)
         }
+    }
+}
+
+/**
+ * Three meters across, for a widget one row tall. Label over value over bar keeps
+ * each cell narrow enough that a long model name and "100%" never collide.
+ */
+@Composable
+private fun ShortLayout(s: WidgetState) {
+    Row(
+        modifier = GlanceModifier.fillMaxSize(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ShortMeter("5H", s.fiveHourPct, GlanceModifier.defaultWeight())
+        Spacer(GlanceModifier.width(10.dp))
+        ShortMeter("1W", s.sevenDayPct, GlanceModifier.defaultWeight())
+        if (s.hasModelWeekly) {
+            Spacer(GlanceModifier.width(10.dp))
+            ShortMeter(s.modelWeeklyName, s.modelWeeklyPct, GlanceModifier.defaultWeight())
+        }
+    }
+}
+
+@Composable
+private fun ShortMeter(label: String, pct: Int, modifier: GlanceModifier) {
+    Column(modifier = modifier) {
+        Text(
+            label,
+            style = TextStyle(
+                color = GlanceTheme.colors.onSurfaceVariant,
+                fontWeight = FontWeight.Bold,
+                fontSize = 10.sp,
+            ),
+            maxLines = 1,
+        )
+        Text(
+            "$pct%",
+            style = TextStyle(
+                color = GlanceTheme.colors.onSurface,
+                fontWeight = FontWeight.Bold,
+                fontSize = 13.sp,
+            ),
+            maxLines = 1,
+        )
+        Spacer(GlanceModifier.height(2.dp))
+        Bar(pct, height = 4.dp)
     }
 }
 
@@ -209,10 +262,10 @@ private fun CompactMeter(label: String, pct: Int) {
 }
 
 @Composable
-private fun Bar(pct: Int) {
+private fun Bar(pct: Int, height: androidx.compose.ui.unit.Dp = 5.dp) {
     LinearProgressIndicator(
         progress = (pct.coerceIn(0, 100)) / 100f,
-        modifier = GlanceModifier.fillMaxWidth().height(5.dp).cornerRadius(3.dp),
+        modifier = GlanceModifier.fillMaxWidth().height(height).cornerRadius(height / 2),
         color = accent,
         backgroundColor = barTrack(),
     )
