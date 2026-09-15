@@ -88,7 +88,9 @@ jobs:
       - name: Upload the APK to this run
         uses: actions/upload-artifact@v4
         with:
-          name: claude-usage-widget-${{ github.sha }}
+          # On a pull_request, github.sha is the ephemeral merge commit, which
+          # appears nowhere in the PR — name the APK after the commit you can see.
+          name: claude-usage-widget-${{ github.event.pull_request.head.sha || github.sha }}
           path: app/build/outputs/apk/**/*.apk
           if-no-files-found: error
 
