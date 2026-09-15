@@ -15,9 +15,14 @@ Keeps your `5H`, `1W` and `1W Fable` percentages (plus *“resets in”* countdo
 
 <br />
 
-### [![Download APK](https://img.shields.io/badge/⬇%20Download%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/utaysi/claude-usage-widget/releases/latest/download/claude-usage-widget.apk)
+### [![Download APK](https://img.shields.io/badge/⬇%20Download%20APK-3DDC84?style=for-the-badge&logo=android&logoColor=white)](https://github.com/eugene8080/claude-usage-widget/releases/latest/download/claude-usage-widget.apk)
 
 Sign in once on the phone; the widget refreshes itself in the background.
+
+<sub>The button serves the latest tagged release. Every push is also built by CI —
+grab `app-debug.apk` from the newest run under
+**[Actions](https://github.com/eugene8080/claude-usage-widget/actions)** to install a
+change that hasn't been tagged yet.</sub>
 
 </div>
 
@@ -25,11 +30,15 @@ Sign in once on the phone; the widget refreshes itself in the background.
 
 ## 📲 Install in 3 steps
 
-1. **[Download the APK](https://github.com/utaysi/claude-usage-widget/releases/latest/download/claude-usage-widget.apk)** on your Android phone (tap the button above).
+1. **[Download the APK](https://github.com/eugene8080/claude-usage-widget/releases/latest/download/claude-usage-widget.apk)** on your Android phone (tap the button above).
 2. **Open the downloaded file** and tap **Install**.
 3. The first time, Android asks to **allow installs from this source** (your browser or file app). Tap **Settings → enable “Allow from this source” → back → Install**. If Play Protect shows an *“unsafe app?”* prompt, that warning appears for any app not installed from the Play Store; choose **Install anyway**.
 
 > Why the warnings? The APK is sideloaded rather than shipped through the Play Store, so Android plays it safe. It's the normal two-tap detour for any direct APK.
+
+> **Replacing an existing install?** Android refuses to install over an APK signed with a
+> different key, so switching between builds from different sources needs an uninstall
+> first. That clears the stored session, so you sign in to Claude again afterwards.
 
 Then continue with first-run setup below.
 
@@ -87,6 +96,10 @@ sdk.dir=/path/to/your/Android/Sdk
 
 **2. Build the debug APK:**
 
+You can skip all of this by letting CI do it — push a branch and download `app-debug.apk`
+from the run under [Actions](https://github.com/eugene8080/claude-usage-widget/actions).
+To build locally:
+
 ```bash
 ./gradlew :app:assembleDebug
 ```
@@ -98,6 +111,20 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 Or copy that APK to the phone and tap it to sideload it directly.
+
+**Cutting a release.** Push a `v*` tag and `.github/workflows/build.yml` publishes the APK
+to Releases as `claude-usage-widget.apk`, which is what the download button resolves to.
+It is signed with the debug key unless you add four repository secrets — `KEYSTORE_BASE64`
+(the keystore, base64-encoded), `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD` — in which
+case CI signs it with your release key. To create a keystore for that:
+
+```bash
+keytool -genkeypair -v -keystore release.keystore -alias claude-usage-widget \
+    -keyalg RSA -keysize 2048 -validity 10000
+base64 -w0 release.keystore   # paste into the KEYSTORE_BASE64 secret
+```
+
+`release.sh` does the same thing locally instead, from a `.signing/keystore.properties`.
 
 **Project layout:**
 

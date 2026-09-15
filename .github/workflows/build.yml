@@ -1,0 +1,122 @@
+name: Build APK
+
+# Every push builds an installable APK and attaches it to the run, so the app
+# can be updated without an Android SDK on the machine doing the updating.
+# Pushing a v* tag also publishes that APK to Releases under a stable name,
+# which is what the README's download button points at.
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # only used by the release step on a v* tag
+
+    env:
+      # Optional. Set all four repository secrets to get a release-signed APK
+      # on tags; without them the workflow still produces a debug-signed one,
+      # which sideloads fine and needs no keystore to manage. See the README.
+      KEYSTORE_B64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # versionCode is derived from the commit count
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # The runner image ships an Android SDK but not necessarily this
+      # platform, and an implicit download is easy to misread when it fails.
+      - name: Install Android SDK platform 36
+        run: |
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null 2>&1 || true
+          "$sdkmanager" "platforms;android-36" "build-tools;36.0.0"
+
+      # app/build.gradle.kts picks up release signing from this gitignored
+      # file when it exists, and quietly builds unsigned when it doesn't.
+      - name: Restore the signing config
+        if: env.KEYSTORE_B64 != ''
+        run: |
+          mkdir -p .signing
+          printf '%s' "$KEYSTORE_B64" | base64 -d > .signing/release.keystore
+          cat > .signing/keystore.properties <<EOF
+          storeFile=.signing/release.keystore
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      # Same derivation release.sh uses: the tag is the versionName, and the
+      # commit count is a versionCode that always increases. Without this every
+      # CI release would ship versionCode 3 and refuse to install over itself.
+      - name: Stamp the version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          code="$(git rev-list --count HEAD)"
+          sed -i -E "s/versionCode = [0-9]+/versionCode = ${code}/" app/build.gradle.kts
+          sed -i -E "s/versionName = \"[^\"]*\"/versionName = \"${version}\"/" app/build.gradle.kts
+          echo "Building ${version} (versionCode ${code})"
+
+      - name: Build the debug APK
+        run: ./gradlew --no-daemon :app:assembleDebug
+
+      # Without a keystore assembleRelease only yields app-release-unsigned.apk,
+      # which won't install — so it's only worth building when signing is set up.
+      - name: Build the release APK
+        if: startsWith(github.ref, 'refs/tags/v') && env.KEYSTORE_B64 != ''
+        run: ./gradlew --no-daemon :app:assembleRelease
+
+      - name: Upload the APK to this run
+        uses: actions/upload-artifact@v4
+        with:
+          # On a pull_request, github.sha is the ephemeral merge commit, which
+          # appears nowhere in the PR — name the APK after the commit you can see.
+          name: claude-usage-widget-${{ github.event.pull_request.head.sha || github.sha }}
+          path: app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+
+      - name: Stage the release asset
+        if: startsWith(github.ref, 'refs/tags/v')
+        id: asset
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            cp app/build/outputs/apk/release/app-release.apk claude-usage-widget.apk
+            echo "signing=the release key" >> "$GITHUB_OUTPUT"
+          else
+            cp app/build/outputs/apk/debug/app-debug.apk claude-usage-widget.apk
+            echo "signing=the debug key (no signing secrets configured)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish the release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNING: ${{ steps.asset.outputs.signing }}
+        run: |
+          tag="${GITHUB_REF_NAME}"
+          gh release create "$tag" claude-usage-widget.apk --title "$tag" --generate-notes
+          gh release edit "$tag" --notes "$(gh release view "$tag" --json body --jq .body)
+
+          ---
+          Built by CI from \`${GITHUB_SHA}\`, signed with ${SIGNING}. Installing over an
+          APK signed with a different key needs an uninstall first, which clears the
+          stored session and means signing in to Claude again."
