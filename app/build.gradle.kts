@@ -41,6 +41,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Use the private key for debug builds too when one is configured, so an APK
+            // pulled from an Actions run installs over a release rather than colliding
+            // with it. Without a key AGP falls back to a per-machine debug keystore, and
+            // a CI runner is a new machine every run — which is how consecutive releases
+            // ended up signed differently and refusing to install over each other.
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
+        }
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
