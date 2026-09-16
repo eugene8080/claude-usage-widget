@@ -27,6 +27,23 @@ android {
         targetSdk = 36
         versionCode = 3
         versionName = "1.0"
+
+        // Point the Connect IQ SDK at the simulator instead of a real watch:
+        //   ./gradlew assembleDebug -PciqTethered=true
+        // then `adb forward tcp:7381 tcp:7381` and start the simulator's adb connection.
+        // A build flag rather than a runtime setting, so a shipped build cannot be talked
+        // into tethered mode and there is no dev-only switch in the UI.
+        buildConfigField(
+            "boolean",
+            "CIQ_TETHERED",
+            (project.findProperty("ciqTethered") == "true").toString(),
+        )
+    }
+
+    buildFeatures {
+        // Required for BuildConfig.CIQ_TETHERED; AGP 8 does not generate BuildConfig unless
+        // it is asked to.
+        buildConfig = true
     }
 
     signingConfigs {
@@ -91,6 +108,11 @@ dependencies {
 
     // Encrypted storage
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // Garmin Connect IQ companion SDK - pushes the usage snapshot to the watch app.
+    // The same artifact drives both a real watch (via Garmin Connect Mobile) and the
+    // Connect IQ simulator over adb; see WatchBridge and watch/README.md.
+    implementation("com.garmin.connectiq:ciq-companion-app-sdk:2.4.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
