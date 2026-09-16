@@ -36,12 +36,29 @@ monkeydo build/ClaudeUsage.prg fenix847mm      # loads it into a running simulat
 
 ## Testing the phone link without a watch
 
-The Connect IQ simulator can talk to a companion app running on an Android device **or
-emulator** over adb, at simulated BLE speeds - no physical watch, and no Garmin Connect Mobile:
+The Connect IQ simulator talks to the companion app running on an Android device **or
+emulator** over adb, at simulated BLE speeds - no physical watch, and no Garmin Connect
+Mobile. Verified working end to end on 2026-09-16.
 
-1. Companion calls `ConnectIQ.getInstance(context, IQConnectType.TETHERED)` (the ADB edition).
-2. `adb forward tcp:7381 tcp:7381`
-3. Simulator: **adb Connection > Start** (Ctrl-F1).
+```
+./gradlew assembleDebug -PciqTethered=true && adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb forward tcp:7381 tcp:7381
+monkeydo watch/build/ClaudeUsage-fenix847mm.prg fenix847mm
+```
+
+**Order matters, and it is the one thing that will waste your afternoon.** The phone app is
+the *server*: its SDK opens port 7381 only while a push is running, and the simulator's
+connect attempt does not retry. So:
+
+1. Trigger a refresh on the phone (tap the widget). The app logs
+   `ConnectIQ-AdbConnection: Waiting for simulator connection.` and the socket is now open.
+   It stays open for as long as the app process lives.
+2. **Then** in the simulator: **adb Connection > Start** (Ctrl-F1). It logs
+   `Simulator connected`.
+3. Trigger another refresh. That one lands: `Wrote N bytes to output stream` /
+   `ClaudeWatch: watch updated: Simulator`.
+
+Clicking Start first connects to nothing and looks identical to a broken bridge.
 
 ## Layout note
 
