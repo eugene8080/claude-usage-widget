@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <!--
+      A watch-app rather than a widget: watch-apps get a glance on fenix 8 class hardware
+      (appTypes includes "glance"), which is the whole point here - the numbers should be
+      readable from the glance carousel without launching anything.
+
+      minApiLevel 3.3 is the floor for GlanceView. The app itself never talks to claude.ai:
+      Cloudflare's cf_clearance can only be minted in a real browser engine, and a Claude
+      sessionKey has no business living in unencrypted watch storage. The phone authenticates
+      and pushes three numbers over BLE; this app only renders whatever it was last told.
+    -->
+    <iq:application
+        entry="ClaudeUsageApp"
+        id="8a5bd20e02f34f58afb5f357a23a4a65"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="3.3.0"
+        name="@Strings.AppName"
+        type="watch-app">
+
+        <iq:products>
+            <iq:product id="fenix843mm"/>
+            <iq:product id="fenix847mm"/>
+            <iq:product id="fenix8pro47mm"/>
+            <iq:product id="fenix8solar47mm"/>
+            <iq:product id="fenix8solar51mm"/>
+        </iq:products>
+
+        <iq:permissions>
+            <!-- Only to receive messages from the companion app. No web requests are made. -->
+            <iq:uses-permission id="Communications"/>
+        </iq:permissions>
+
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>

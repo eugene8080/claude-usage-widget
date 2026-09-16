@@ -13,3 +13,6 @@ app/build/
 /.signing/
 *.keystore
 *.jks
+
+# Connect IQ build output
+watch/build/
