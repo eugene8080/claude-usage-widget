@@ -16,3 +16,4 @@ app/build/
 
 # Connect IQ build output
 watch/build/
+watch/dist/
