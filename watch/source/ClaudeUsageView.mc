@@ -80,7 +80,7 @@ class ClaudeUsageView extends WatchUi.View {
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(left, y, Graphics.FONT_XTINY, label, Graphics.TEXT_JUSTIFY_LEFT);
 
-        var resets = Snapshot.resetsIn(resetEpoch);
+        var resets = Snapshot.resetsAt(resetEpoch);
         if (!resets.equals("")) {
             dc.drawText(right, y, Graphics.FONT_XTINY, resets, Graphics.TEXT_JUSTIFY_RIGHT);
         }

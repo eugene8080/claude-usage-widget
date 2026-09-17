@@ -1,9 +1,12 @@
 # Claude Usage - Garmin watch app
 
 A glance for fenix 8 class watches, including the **tactix 8**, showing the same three meters
-as the phone widget: `5H`, `1W`, and the per-model weekly cap.
+as the phone widget: `5H`, `1W`, and the per-model weekly cap. Each meter also shows when it
+resets, as a wall-clock time the way the Claude usage menu states it - a clock time for the
+5-hour session (`9:27p`), a weekday for the weekly caps (`Tue`), or a month/day once a reset
+is more than a week out (`Sep 22`). Honours the watch's 12/24-hour setting.
 
-Generated: 2026-09-16
+Generated: 2026-09-17
 
 ## The watch never talks to Claude
 
