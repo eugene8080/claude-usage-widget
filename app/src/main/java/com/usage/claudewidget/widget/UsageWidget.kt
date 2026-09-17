@@ -37,17 +37,20 @@ class UsageWidget : GlanceAppWidget() {
     private fun readState(context: Context): WidgetState {
         val s = Storage.get(context)
         val now = System.currentTimeMillis()
+        // The device clock setting decides 12/24-hour reset times, matching how every other
+        // time on the phone is shown.
+        val is24h = android.text.format.DateFormat.is24HourFormat(context)
         return WidgetState(
             needsLogin = !s.isLoggedIn || s.authState == AuthState.NEEDS_LOGIN,
             hasData = s.hasSnapshot,
             fiveHourPct = s.fiveHourUtil.coerceAtLeast(0f).roundToInt(),
-            fiveHourResets = TimeFmt.resetsIn(s.fiveHourReset, now),
+            fiveHourResets = TimeFmt.resetsAt(s.fiveHourReset, now, is24h),
             sevenDayPct = s.sevenDayUtil.coerceAtLeast(0f).roundToInt(),
-            sevenDayResets = TimeFmt.resetsIn(s.sevenDayReset, now),
+            sevenDayResets = TimeFmt.resetsAt(s.sevenDayReset, now, is24h),
             hasModelWeekly = s.hasModelWeekly,
             modelWeeklyName = s.modelWeeklyName,
             modelWeeklyPct = s.modelWeeklyUtil.coerceAtLeast(0f).roundToInt(),
-            modelWeeklyResets = TimeFmt.resetsIn(s.modelWeeklyReset, now),
+            modelWeeklyResets = TimeFmt.resetsAt(s.modelWeeklyReset, now, is24h),
             stale = TimeFmt.isStale(s.fetchedAt, now),
         )
     }
