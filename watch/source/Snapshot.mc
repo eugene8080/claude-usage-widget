@@ -1,6 +1,8 @@
 import Toybox.Application;
 import Toybox.Lang;
+import Toybox.System;
 import Toybox.Time;
+import Toybox.Time.Gregorian;
 
 //! The last usage snapshot pushed from the phone, and the only state this app holds.
 //!
@@ -121,9 +123,15 @@ module Snapshot {
         return (v instanceof Number) ? v : fallback;
     }
 
-    //! "3h", "45m", "2d" - the countdown to a reset, compressed hard because it shares a
-    //! glance row with two other meters. Empty when no reset time is known.
-    function resetsIn(epochSec as Number) as String {
+    //! When a window resets, as an absolute wall-clock time - the way the Claude usage menu
+    //! states it ("Resets 5:00 AM" / "Resets Sep 22") rather than a countdown, so a glance
+    //! answers "when can I use it again" without arithmetic.
+    //!
+    //! The format follows the distance, which naturally matches the windows: the 5-hour
+    //! session resets within a day, so it reads as a clock time; the weekly caps are days
+    //! out, so they read as a weekday, or a month/day once past a week. Empty when the phone
+    //! sent no reset time, "now" once the reset is due but a fresh snapshot has not arrived.
+    function resetsAt(epochSec as Number) as String {
         if (epochSec == 0) {
             return "";
         }
@@ -131,12 +139,32 @@ module Snapshot {
         if (secs <= 0) {
             return "now";
         }
-        if (secs < 3600) {
-            return (secs / 60).toString() + "m";
-        }
+        var moment = new Time.Moment(epochSec);
         if (secs < 86400) {
-            return (secs / 3600).toString() + "h";
+            // Within a day: clock time, in the device's own 12/24-hour setting.
+            var info = Gregorian.info(moment, Time.FORMAT_SHORT);
+            return clock(info.hour, info.min);
         }
-        return (secs / 86400).toString() + "d";
+        // FORMAT_MEDIUM gives abbreviated names ("Mon", "Sep") rather than the numbers
+        // FORMAT_SHORT would return.
+        var info = Gregorian.info(moment, Time.FORMAT_MEDIUM);
+        if (secs < 7 * 86400) {
+            return info.day_of_week; // "Mon" - unambiguous within the coming week
+        }
+        return info.month + " " + info.day.format("%d"); // "Sep 22"
+    }
+
+    //! "5:00p" / "17:00" - the reset clock time, compressed to fit a glance column and
+    //! honouring the watch's 12/24-hour setting.
+    function clock(hour as Number, min as Number) as String {
+        var mm = min.format("%02d");
+        if (System.getDeviceSettings().is24Hour) {
+            return hour.format("%d") + ":" + mm;
+        }
+        var h = hour % 12;
+        if (h == 0) {
+            h = 12;
+        }
+        return h.format("%d") + ":" + mm + (hour < 12 ? "a" : "p");
     }
 }

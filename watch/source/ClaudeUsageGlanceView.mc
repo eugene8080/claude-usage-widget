@@ -36,44 +36,61 @@ class ClaudeUsageGlanceView extends WatchUi.GlanceView {
         // divisor is the count, not a constant, so a missing third meter widens the other
         // two rather than leaving a hole.
         var count = Snapshot.hasModelWeekly() ? 3 : 2;
-        var gap = w * 0.03;
-        var colW = (w - (gap * (count - 1))) / count;
 
-        drawMeter(dc, 0, colW, h, "5H", Snapshot.percent(Snapshot.K_FIVE));
-        drawMeter(dc, colW + gap, colW, h, "1W", Snapshot.percent(Snapshot.K_WEEK));
+        // A round display clips the corners of the glance band, and the band sits high on the
+        // screen so its top is the narrowest part - a full-width layout loses the ends of the
+        // outer labels ("5H" -> "H", "Fable" -> "Fa"). Inset the columns and keep the top row
+        // out of the very top so every label clears the bezel.
+        var inset = w * 0.12;
+        var avail = w - (2 * inset);
+        var gap = w * 0.03;
+        var colW = (avail - (gap * (count - 1))) / count;
+
+        // resetAt() resolves the storage key to an epoch; resetsAt() formats that epoch as a
+        // wall-clock time. Both steps here, same as the full view does.
+        drawMeter(dc, inset, colW, h, "5H", Snapshot.percent(Snapshot.K_FIVE),
+            Snapshot.resetsAt(Snapshot.resetAt(Snapshot.K_FIVE_RESET)));
+        drawMeter(dc, inset + colW + gap, colW, h, "1W", Snapshot.percent(Snapshot.K_WEEK),
+            Snapshot.resetsAt(Snapshot.resetAt(Snapshot.K_WEEK_RESET)));
         if (count == 3) {
             drawMeter(
                 dc,
-                (colW + gap) * 2,
+                inset + ((colW + gap) * 2),
                 colW,
                 h,
                 Snapshot.modelName(),
-                Snapshot.percent(Snapshot.K_MODEL)
+                Snapshot.percent(Snapshot.K_MODEL),
+                Snapshot.resetsAt(Snapshot.resetAt(Snapshot.K_MODEL_RESET))
             );
         }
 
         if (Snapshot.isStale()) {
             // A small dot rather than text: the numbers are still worth showing, they just
-            // should not be trusted to the minute.
+            // should not be trusted to the minute. Kept inside the inset so the round bezel
+            // does not eat it.
             dc.setColor(STALE, Graphics.COLOR_TRANSPARENT);
-            dc.fillCircle(w - 5, 5, 4);
+            dc.fillCircle(w - inset, h * 0.14, 4);
         }
     }
 
-    //! One meter: label, percentage, bar - stacked, so a long model name and "100%" never
-    //! collide in a narrow column.
+    //! One meter: label, percentage, reset time, bar - stacked, so a long model name and
+    //! "100%" never collide in a narrow column. The reset line is what makes the glance
+    //! answer "when is it back", the way the Claude usage menu does; it is dimmed so the
+    //! percentage stays the thing the eye lands on.
     private function drawMeter(
         dc as Dc,
         x as Numeric,
         colW as Numeric,
         h as Numeric,
         label as String,
-        pct as Number
+        pct as Number,
+        resets as String
     ) as Void {
-        var labelY = h * 0.08;
-        var valueY = h * 0.36;
-        var barY = h * 0.78;
-        var barH = h * 0.10;
+        var labelY = h * 0.17;
+        var valueY = h * 0.39;
+        var resetY = h * 0.63;
+        var barY = h * 0.87;
+        var barH = h * 0.08;
 
         dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
         dc.drawText(x, labelY, Graphics.FONT_XTINY, label, Graphics.TEXT_JUSTIFY_LEFT);
@@ -86,6 +103,11 @@ class ClaudeUsageGlanceView extends WatchUi.GlanceView {
             pct.toString() + "%",
             Graphics.TEXT_JUSTIFY_LEFT
         );
+
+        if (!resets.equals("")) {
+            dc.setColor(Graphics.COLOR_LT_GRAY, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(x, resetY, Graphics.FONT_XTINY, resets, Graphics.TEXT_JUSTIFY_LEFT);
+        }
 
         dc.setColor(TRACK, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(x, barY, colW, barH);
