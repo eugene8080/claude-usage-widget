@@ -60,7 +60,7 @@ private val SHORT_MAX_HEIGHT = 80.dp
 /** Heights below which three meters leave no room for the Claude mark above them. */
 private val FULL_MARK_MIN_HEIGHT = 130.dp
 private val COMPACT_MARK_MIN_HEIGHT = 100.dp
-/** Below this width "resets in" is dropped and only the countdown is shown. */
+/** Below this width the "resets" prefix is dropped and only the reset time is shown. */
 private val RESET_PREFIX_MIN_WIDTH = 220.dp
 
 // Colors come from resources so they auto-adapt to light/dark via values-night.
@@ -140,18 +140,23 @@ private fun ShortLayout(s: WidgetState) {
         modifier = GlanceModifier.fillMaxSize(),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ShortMeter("5H", s.fiveHourPct, GlanceModifier.defaultWeight())
+        ShortMeter("5H", s.fiveHourPct, s.fiveHourResets, GlanceModifier.defaultWeight())
         Spacer(GlanceModifier.width(10.dp))
-        ShortMeter("1W", s.sevenDayPct, GlanceModifier.defaultWeight())
+        ShortMeter("1W", s.sevenDayPct, s.sevenDayResets, GlanceModifier.defaultWeight())
         if (s.hasModelWeekly) {
             Spacer(GlanceModifier.width(10.dp))
-            ShortMeter(s.modelWeeklyName, s.modelWeeklyPct, GlanceModifier.defaultWeight())
+            ShortMeter(
+                s.modelWeeklyName,
+                s.modelWeeklyPct,
+                s.modelWeeklyResets,
+                GlanceModifier.defaultWeight(),
+            )
         }
     }
 }
 
 @Composable
-private fun ShortMeter(label: String, pct: Int, modifier: GlanceModifier) {
+private fun ShortMeter(label: String, pct: Int, resets: String, modifier: GlanceModifier) {
     Column(modifier = modifier) {
         Text(
             label,
@@ -169,6 +174,13 @@ private fun ShortMeter(label: String, pct: Int, modifier: GlanceModifier) {
                 fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
             ),
+            maxLines = 1,
+        )
+        // The reset time, dimmed so the percentage stays the thing the eye lands on. This is
+        // the one-row analogue of the watch glance's reset line.
+        Text(
+            resets,
+            style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 9.sp),
             maxLines = 1,
         )
         Spacer(GlanceModifier.height(2.dp))
@@ -205,7 +217,7 @@ private fun MeterRow(label: String, pct: Int, resets: String, showResetPrefix: B
             )
             Spacer(GlanceModifier.defaultWeight())
             Text(
-                if (showResetPrefix) "resets in $resets" else resets,
+                if (showResetPrefix) "resets $resets" else resets,
                 style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
                 maxLines = 1,
             )
