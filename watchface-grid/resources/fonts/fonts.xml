@@ -8,4 +8,6 @@
     <font id="CPValue" filename="cp_value.fnt" />
     <font id="CPSmall" filename="cp_small.fnt" />
     <font id="CPLabel" filename="cp_label.fnt" />
+    <!-- Per-field icons from Tabler Icons (MIT), one glyph per complication type. -->
+    <font id="TablerIcon" filename="cp_icon.fnt" />
 </fonts>

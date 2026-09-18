@@ -5,18 +5,22 @@ import Toybox.WatchUi;
 //! A data slot's visual style.
 module SlotKind {
     enum {
-        CHIP = 0,   // label over value (Data 01/02/03/06/08)
-        RING = 1    // gradient ring gauge with label + value inside (Data 04/05)
+        CHIP = 0,   // label/icon over value (Data 01/02/03/06/08)
+        RING = 1    // gradient ring gauge with label/icon + value inside (Data 04/05)
     }
 }
 
-//! One user-editable data field. It draws itself (chip or ring) at a fixed centre using the
-//! shared Chakra Petch fonts, and exposes a bounding box so the view can hit-test taps and the
-//! native watch face editor can "pulse" the selected slot. The view feeds it a live label,
-//! value and (for rings) fill fraction as the assigned complication updates.
+//! One user-editable data field. Draws itself (chip or ring) at a fixed centre using the shared
+//! Chakra Petch fonts, and exposes a bounding box so the view can hit-test taps and the native
+//! watch face editor can "pulse" the selected slot. The view feeds it a live icon, value and
+//! (for rings) fill fraction as the assigned complication updates.
+//!
+//! The value auto-fits: it is drawn with the largest of `_valueFonts` (largest -> smallest) that
+//! fits `_valueMaxW`, so wide readings (6-digit pressure, "16/8" temps) shrink instead of
+//! overflowing. High/low temperature is drawn stacked (two lines) when valueTop/valueBot are set.
 class ClaudeGridSlot extends WatchUi.Drawable {
 
-    public var uid as Number;           // config <complication id> == the editor's uniqueIdentifier
+    public var uid as Number;
     public var kind as Number;
     public var cx as Number;
     public var cy as Number;
@@ -25,21 +29,31 @@ class ClaudeGridSlot extends WatchUi.Drawable {
     public var striped as Boolean;
 
     public var label as String = "";
-    public var value as String = "--";
+    public var value as String = "--";     // single-line reading
+    public var valueTop as String = "";    // stacked (hi/low temp): top line
+    public var valueBot as String = "";    // stacked: bottom line
+    public var iconChar as String = "";    // icon glyph for the assigned complication ("" = none)
     public var frac as Float = 0.0;
-    public var sweep as Float = 1.0;    // 0..1 wake-in fill multiplier (rings only)
+    public var sweep as Float = 1.0;       // 0..1 wake-in fill multiplier (rings only)
     public var valueColor as Number = 0xFFA480;
     public var labelColor as Number = 0x888888;
 
     private var _fLabel as Graphics.FontType;
-    private var _fValue as Graphics.FontType;   // chip -> CPValue (32px); ring -> CPRing (36px)
+    private var _fIcon as Graphics.FontType?;    // Tabler icon glyph (may be null)
+    private var _fStacked as Graphics.FontType;  // compact font for the two stacked temp lines
+    private var _valueFonts as Array;            // largest -> smallest, for auto-fit
+    private var _valueMaxW as Number;            // width budget for the value
 
     // text offsets, in px (tied to the fixed bitmap-font heights)
     private const _CHIP_LABEL_DY = 22;
+    private const _CHIP_ICON_DY = 25;
+    private const _CHIP_STACK_DY = 30;   // icon lifted for the two-line temp
     private const _RING_LABEL_DY = 23;
+    private const _RING_ICON_DY = 20;
     private const _RING_VALUE_DY = 10;
 
-    //! @param opts :uid, :kind, :cx, :cy, :ringR, :ringPen, :striped, :fLabel, :fValue
+    //! @param opts :uid, :kind, :cx, :cy, :ringR, :ringPen, :striped, :fLabel, :fIcon,
+    //!             :valueFonts (Array), :fStacked, :valueMaxW
     function initialize(opts as Dictionary) {
         Drawable.initialize({ :identifier => opts[:uid] });
         uid = opts[:uid];
@@ -50,7 +64,10 @@ class ClaudeGridSlot extends WatchUi.Drawable {
         ringPen = opts.hasKey(:ringPen) ? opts[:ringPen] : 6;
         striped = opts.hasKey(:striped) ? opts[:striped] : false;
         _fLabel = opts[:fLabel];
-        _fValue = opts[:fValue];
+        _fIcon = opts[:fIcon];
+        _valueFonts = opts[:valueFonts];
+        _fStacked = opts[:fStacked];
+        _valueMaxW = opts[:valueMaxW];
     }
 
     //! Bounding box for tap hit-testing and the editor pulse animation.
@@ -61,7 +78,7 @@ class ClaudeGridSlot extends WatchUi.Drawable {
             bb.addRectangle(cx - r, cy - r, 2 * r, 2 * r);
         } else {
             var halfW = 55;
-            bb.addRectangle(cx - halfW, cy - 30, 2 * halfW, 52);
+            bb.addRectangle(cx - halfW, cy - 34, 2 * halfW, 62);
         }
         return bb;
     }
@@ -70,24 +87,50 @@ class ClaudeGridSlot extends WatchUi.Drawable {
         return getBoundingBox().includesPoint(x, y);
     }
 
-    //! Draw the slot. The gradient ring (for RING slots) is drawn here too so a pulsing editor
-    //! preview shows the full gauge, not just text.
-    function draw(dc as Dc) as Void {
-        if (!isVisible) { return; }
-        if (kind == SlotKind.RING) {
-            GridDraw.gradientRing(dc, cx, cy, ringR, ringPen, frac * sweep, striped);
-            dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - _RING_LABEL_DY, _fLabel, label,
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-            dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy + _RING_VALUE_DY, _fValue, value,
+    //! Largest value font whose rendering of `text` fits the width budget.
+    private function pickFont(dc as Dc, text as String) as Graphics.FontType {
+        for (var i = 0; i < _valueFonts.size(); i++) {
+            if (dc.getTextWidthInPixels(text, _valueFonts[i]) <= _valueMaxW) {
+                return _valueFonts[i];
+            }
+        }
+        return _valueFonts[_valueFonts.size() - 1];
+    }
+
+    //! Draw the field marker (icon if we have one + the icon font, else the text label).
+    private function drawMarker(dc as Dc, x as Numeric, y as Numeric) as Void {
+        dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
+        if (!iconChar.equals("") && _fIcon != null) {
+            dc.drawText(x, y, _fIcon, iconChar,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else {
-            dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy - _CHIP_LABEL_DY, _fLabel, label,
+            dc.drawText(x, y, _fLabel, label,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        }
+    }
+
+    function draw(dc as Dc) as Void {
+        if (!isVisible) { return; }
+        var hasIcon = (!iconChar.equals("") && _fIcon != null);
+        var stacked = !valueTop.equals("");
+
+        if (kind == SlotKind.RING) {
+            GridDraw.gradientRing(dc, cx, cy, ringR, ringPen, frac * sweep, striped);
+            drawMarker(dc, cx, cy - (hasIcon ? _RING_ICON_DY : _RING_LABEL_DY));
             dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, cy, _fValue, value,
+            dc.drawText(cx, cy + _RING_VALUE_DY, pickFont(dc, value), value,
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else if (stacked) {
+            drawMarker(dc, cx, cy - _CHIP_STACK_DY);
+            dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy - 8, _fStacked, valueTop,
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            dc.drawText(cx, cy + 14, _fStacked, valueBot,
+                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else {
+            drawMarker(dc, cx, cy - (hasIcon ? _CHIP_ICON_DY : _CHIP_LABEL_DY));
+            dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, cy, pickFont(dc, value), value,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
     }
