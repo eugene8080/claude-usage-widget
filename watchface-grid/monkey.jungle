@@ -1,0 +1,10 @@
+project.manifest = manifest.xml
+
+base.sourcePath = source
+base.resourcePath = resources
+
+fenix847mm.resourcePath = $(base.resourcePath);resources-round-454x454
+fenix8pro47mm.resourcePath = $(base.resourcePath);resources-round-454x454
+fenix843mm.resourcePath = $(base.resourcePath);resources-round-416x416
+fenix8solar47mm.resourcePath = $(base.resourcePath);resources-round-260x260
+fenix8solar51mm.resourcePath = $(base.resourcePath);resources-round-280x280

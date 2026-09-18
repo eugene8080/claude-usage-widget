@@ -21,3 +21,9 @@ watch/dist/
 # Connect IQ watch face build output
 watchface/build/
 watchface/dist/
+
+watchface-grid/build/
+watchface-grid/dist/
+
+# Python tooling cache (font generators)
+__pycache__/

@@ -1,0 +1,11 @@
+<fonts>
+    <!-- Chakra Petch (SemiBold), generated from the TTF into CIQ bitmap fonts by
+         tools/build_fonts.py. Each carries only the glyphs its fields draw, so the big
+         sizes stay small: CPTime/CPRing are digits only; the rest add letters + symbols.
+         Sizes come straight from the layout editor's final scales. -->
+    <font id="CPTime"  filename="cp_time.fnt" />
+    <font id="CPRing"  filename="cp_ring.fnt" />
+    <font id="CPValue" filename="cp_value.fnt" />
+    <font id="CPSmall" filename="cp_small.fnt" />
+    <font id="CPLabel" filename="cp_label.fnt" />
+</fonts>
