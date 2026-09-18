@@ -8,6 +8,7 @@ import Toybox.System;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
 import Toybox.WatchUi;
+import Toybox.Weather;
 
 //! "Claude Grid" - Iron Grit-style data face in Chakra Petch. Field naming follows the Iron
 //! Grit "Data Position" chart: Data 01 top-centre, 02/04/06 down the left, 03/05/08 down the
@@ -30,6 +31,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private var _fValue as Graphics.FontType?;    // 32px         - chip values + date
     private var _fSmall as Graphics.FontType?;    // 22px         - battery %, weekday letters
     private var _fLabel as Graphics.FontType?;    // 16px         - field labels
+    private var _fIcon as Graphics.FontType?;     // 24px         - Tabler per-field icons
 
     private var _editMode as Boolean = false;
     private var _accentColor as Number = _DEFAULT_ACCENT;
@@ -58,6 +60,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
         _fValue = WatchUi.loadResource(Rez.Fonts.CPValue) as Graphics.FontType;
         _fSmall = WatchUi.loadResource(Rez.Fonts.CPSmall) as Graphics.FontType;
         _fLabel = WatchUi.loadResource(Rez.Fonts.CPLabel) as Graphics.FontType;
+        _fIcon = WatchUi.loadResource(Rez.Fonts.TablerIcon) as Graphics.FontType;
 
         buildSlots(dc.getWidth(), dc.getHeight());
 
@@ -88,15 +91,15 @@ class ClaudeGridView extends WatchUi.WatchFace {
     //! complication type. Positions and sizes are the layout editor's final numbers.
     private function buildSlots(w as Number, h as Number) as Void {
         var ringR = (w * 0.115 * 0.92).toNumber();
-        // uid, kind, fx, fy, ringR, pen, striped, defaultType, valueFont
+        // uid, kind, fx, fy, ringR, pen, striped, defaultType
         var specs = [
-            [1, SlotKind.CHIP, 0.504, 0.127, 0,     0, false, Complications.COMPLICATION_TYPE_BATTERY,             _fValue],
-            [2, SlotKind.CHIP, 0.166, 0.282, 0,     0, false, Complications.COMPLICATION_TYPE_STEPS,               _fValue],
-            [3, SlotKind.CHIP, 0.834, 0.282, 0,     0, false, Complications.COMPLICATION_TYPE_VO2MAX_RUN,          _fValue],
-            [4, SlotKind.RING, 0.129, 0.497, ringR, 6, false, Complications.COMPLICATION_TYPE_HEART_RATE,          _fRing],
-            [5, SlotKind.RING, 0.871, 0.497, ringR, 6, false, Complications.COMPLICATION_TYPE_BODY_BATTERY,        _fRing],
-            [6, SlotKind.CHIP, 0.154, 0.742, 0,     0, false, Complications.COMPLICATION_TYPE_SEA_LEVEL_PRESSURE,  _fValue],
-            [8, SlotKind.CHIP, 0.846, 0.742, 0,     0, false, Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE, _fValue]
+            [1, SlotKind.CHIP, 0.500, 0.127, 0,     0, false, Complications.COMPLICATION_TYPE_BATTERY],
+            [2, SlotKind.CHIP, 0.166, 0.282, 0,     0, false, Complications.COMPLICATION_TYPE_STEPS],
+            [3, SlotKind.CHIP, 0.834, 0.282, 0,     0, false, Complications.COMPLICATION_TYPE_VO2MAX_RUN],
+            [4, SlotKind.RING, 0.129, 0.497, ringR, 6, false, Complications.COMPLICATION_TYPE_HEART_RATE],
+            [5, SlotKind.RING, 0.871, 0.497, ringR, 6, false, Complications.COMPLICATION_TYPE_BODY_BATTERY],
+            [6, SlotKind.CHIP, 0.154, 0.742, 0,     0, false, Complications.COMPLICATION_TYPE_SEA_LEVEL_PRESSURE],
+            [8, SlotKind.CHIP, 0.846, 0.742, 0,     0, false, Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE]
         ];
 
         _slots = [];
@@ -104,6 +107,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
         for (var i = 0; i < specs.size(); i++) {
             var s = specs[i];
             var uid = s[0] as Number;
+            var isRing = (s[1] == SlotKind.RING);
             var slot = new ClaudeGridSlot({
                 :uid => uid,
                 :kind => s[1],
@@ -113,7 +117,10 @@ class ClaudeGridView extends WatchUi.WatchFace {
                 :ringPen => s[5],
                 :striped => s[6],
                 :fLabel => _fLabel,
-                :fValue => s[8]
+                :fIcon => _fIcon,
+                :valueFonts => (isRing ? [_fRing, _fSmall] : [_fValue, _fSmall, _fLabel]),
+                :fStacked => _fSmall,
+                :valueMaxW => (isRing ? (s[4] * 1.6).toNumber() : (w * 0.22).toNumber())
             });
             slot.labelColor = DIM;
             slot.valueColor = _dataColor;
@@ -135,19 +142,43 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (slot == null) { return; }
         var id = _slotIds[uid];
         if (id == null) { return; }
+        var cid = id as Complications.Id;
+        var t = cid.getType();
+        slot.iconChar = iconCharFor(t);
         try {
-            var c = Complications.getComplication(id as Complications.Id);
+            var c = Complications.getComplication(cid);
             var lbl = c.shortLabel;
             if (lbl == null) { lbl = c.longLabel; }
             if (lbl == null) { lbl = defaultLabel(uid); }
             slot.label = (lbl as String).toUpper();
-            slot.value = valStr(c.value);
+            var vs = valStr(c.value);
+            // The Claude usage meters are percent-used - show a "%".
+            if ((c.value != null) && isPercentUsage(t, c.longLabel)) {
+                vs = vs + "%";
+            }
+            // High/low temperature stacks (high over low) instead of one wide line.
+            slot.valueTop = "";
+            slot.valueBot = "";
+            if (t == Complications.COMPLICATION_TYPE_HIGH_LOW_TEMPERATURE) {
+                var parts = splitTwo(vs);
+                if (parts != null) {
+                    slot.valueTop = parts[0];
+                    slot.valueBot = parts[1];
+                    slot.value = "";
+                } else {
+                    slot.value = vs;
+                }
+            } else {
+                slot.value = vs;
+            }
             if (slot.kind == SlotKind.RING) {
-                slot.frac = ringFrac(id, c.value);
+                slot.frac = ringFrac(cid, c.value);
             }
         } catch (e) {
             slot.label = defaultLabel(uid);
             slot.value = "--";
+            slot.valueTop = "";
+            slot.valueBot = "";
             slot.frac = 0.0;
         }
     }
@@ -243,9 +274,11 @@ class ClaudeGridView extends WatchUi.WatchFace {
             slot.draw(dc);
         }
 
-        drawTime(dc, w * 0.484, cy);
-        drawSeconds07(dc, w * 0.499, h * 0.829, w * 0.085);
-        drawDate(dc, w * 0.316, h * 0.817, w * 0.680, h * 0.814);
+        // Centre-column elements all share the true vertical axis (cx). The date halves flank
+        // the seconds dial symmetrically at one height. (Left/right column slots are untouched.)
+        drawTime(dc, cx, cy);
+        drawSeconds07(dc, cx, h * 0.829, w * 0.085);
+        drawDate(dc, cx - w * 0.184, h * 0.815, cx + w * 0.184, h * 0.815);
         drawWeekCurved(dc, cx, cy, h * 0.964 - cy);
     }
 
@@ -365,7 +398,8 @@ class ClaudeGridView extends WatchUi.WatchFace {
                        || t == Complications.COMPLICATION_TYPE_BATTERY
                        || t == Complications.COMPLICATION_TYPE_PULSE_OX
                        || t == Complications.COMPLICATION_TYPE_STRESS
-                       || t == Complications.COMPLICATION_TYPE_SLEEP_SCORE)) {
+                       || t == Complications.COMPLICATION_TYPE_SLEEP_SCORE
+                       || t == Complications.COMPLICATION_TYPE_INVALID)) {  // Claude % meters
             var f = 0.0;
             if (v instanceof Lang.Float || v instanceof Lang.Double) {
                 f = v.toFloat() / 100.0;
@@ -377,6 +411,32 @@ class ClaudeGridView extends WatchUi.WatchFace {
             return f;
         }
         return 0.66;
+    }
+
+    //! The Claude usage meters are custom (INVALID-type) complications whose value is a
+    //! percent-used, so their reading gets a trailing "%". The "Claude ... usage" long label is
+    //! matched as a fallback in case a device reports a non-INVALID type for them.
+    private function isPercentUsage(t as Complications.Type or Null, longLabel as String or Null) as Boolean {
+        if (t == Complications.COMPLICATION_TYPE_INVALID) { return true; }
+        if (longLabel != null) {
+            var s = longLabel as String;
+            if ((s.find("Claude") != null) || (s.find("usage") != null)) { return true; }
+        }
+        return false;
+    }
+
+    //! Split a "high<sep>low" reading into two parts on '/' or whitespace. Returns null if it
+    //! can't be split cleanly (then it's shown as a single auto-fitted line).
+    private function splitTwo(s as String) as Array<String>? {
+        var sep = s.find("/");
+        if (sep == null) { sep = s.find(" "); }
+        if (sep == null) { return null; }
+        var a = s.substring(0, sep);
+        var b = s.substring(sep + 1, s.length());
+        if ((a == null) || (b == null) || (a.length() == 0) || (b.length() == 0)) {
+            return null;
+        }
+        return [a, b];
     }
 
     //! Render a complication value compactly (whole numbers; floats rounded).
@@ -397,6 +457,110 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (uid == 5) { return "BB"; }
         if (uid == 6) { return "mb"; }
         return "°C";
+    }
+
+    //! Tabler icon glyph for a complication type, or "" to fall back to the text label.
+    private function iconCharFor(t as Complications.Type or Null) as String {
+        var cp = iconCodeFor(t);
+        if (cp == 0) { return ""; }
+        return cp.toChar().toString();
+    }
+
+    //! Complication type -> Tabler codepoint (0 = no icon). Weather uses a static cloud here;
+    //! the weather-reactive picker refines it per condition.
+    private function iconCodeFor(t as Complications.Type or Null) as Number {
+        if (t == null) { return 0; }
+        if (t == Complications.COMPLICATION_TYPE_BATTERY) { return 0xea34; }
+        if (t == Complications.COMPLICATION_TYPE_STEPS) { return 0xec87; }
+        if (t == Complications.COMPLICATION_TYPE_HEART_RATE) { return 0xef92; }
+        if (t == Complications.COMPLICATION_TYPE_BODY_BATTERY) { return 0xea38; }
+        if (t == Complications.COMPLICATION_TYPE_VO2MAX_RUN
+         || t == Complications.COMPLICATION_TYPE_VO2MAX_BIKE) { return 0xef62; }
+        if (t == Complications.COMPLICATION_TYPE_RESPIRATION_RATE) { return 0xef62; }
+        if (t == Complications.COMPLICATION_TYPE_SEA_LEVEL_PRESSURE) { return 0xeab1; }
+        if (t == Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE
+         || t == Complications.COMPLICATION_TYPE_HIGH_LOW_TEMPERATURE) { return 0xeb38; }
+        if (t == Complications.COMPLICATION_TYPE_CALORIES) { return 0xec2c; }
+        if (t == Complications.COMPLICATION_TYPE_FLOORS_CLIMBED) { return 0xeca5; }
+        if (t == Complications.COMPLICATION_TYPE_ALTITUDE) { return 0xef97; }
+        if (t == Complications.COMPLICATION_TYPE_STRESS) { return 0xf0db; }
+        if (t == Complications.COMPLICATION_TYPE_PULSE_OX) { return 0xea97; }
+        if (t == Complications.COMPLICATION_TYPE_INTENSITY_MINUTES) { return 0xff9b; }
+        if (t == Complications.COMPLICATION_TYPE_NOTIFICATION_COUNT) { return 0xea35; }
+        if (t == Complications.COMPLICATION_TYPE_SUNRISE) { return 0xef1c; }
+        if (t == Complications.COMPLICATION_TYPE_SUNSET) { return 0xec31; }
+        if (t == Complications.COMPLICATION_TYPE_CURRENT_WEATHER
+         || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_1DAY
+         || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_2DAY
+         || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_3DAY) { return weatherCode(); }
+        if (t == Complications.COMPLICATION_TYPE_DATE
+         || t == Complications.COMPLICATION_TYPE_WEEKDAY_MONTHDAY) { return 0xea53; }
+        if (t == Complications.COMPLICATION_TYPE_SLEEP_SCORE) { return 0xeaf8; }
+        if (t == Complications.COMPLICATION_TYPE_RECOVERY_TIME) { return 0xf228; }
+        if (t == Complications.COMPLICATION_TYPE_SOLAR_INPUT) { return 0xeb30; }
+        return 0;
+    }
+
+    //! Current-conditions weather glyph, so a weather field's icon changes with the weather.
+    //! Falls back to a plain cloud when conditions are unavailable.
+    private function weatherCode() as Number {
+        try {
+            var cc = Weather.getCurrentConditions();
+            if (cc != null && cc.condition != null) {
+                return weatherGlyph(cc.condition);
+            }
+        } catch (ex) {
+        }
+        return 0xea76; // cloud
+    }
+
+    //! Map a Weather.CONDITION_* value to a Tabler weather glyph.
+    private function weatherGlyph(c as Number) as Number {
+        // clear / fair -> sun
+        if (c == Weather.CONDITION_CLEAR || c == Weather.CONDITION_FAIR
+         || c == Weather.CONDITION_MOSTLY_CLEAR || c == Weather.CONDITION_PARTLY_CLEAR) {
+            return 0xeb30;
+        }
+        // severe -> storm
+        if (c == Weather.CONDITION_THUNDERSTORMS || c == Weather.CONDITION_SCATTERED_THUNDERSTORMS
+         || c == Weather.CONDITION_CHANCE_OF_THUNDERSTORMS || c == Weather.CONDITION_HURRICANE
+         || c == Weather.CONDITION_TROPICAL_STORM || c == Weather.CONDITION_TORNADO) {
+            return 0xea74;
+        }
+        // snow / ice / mix -> cloud-snow
+        if (c == Weather.CONDITION_SNOW || c == Weather.CONDITION_LIGHT_SNOW
+         || c == Weather.CONDITION_HEAVY_SNOW || c == Weather.CONDITION_FLURRIES
+         || c == Weather.CONDITION_CHANCE_OF_SNOW || c == Weather.CONDITION_CLOUDY_CHANCE_OF_SNOW
+         || c == Weather.CONDITION_WINTRY_MIX || c == Weather.CONDITION_RAIN_SNOW
+         || c == Weather.CONDITION_LIGHT_RAIN_SNOW || c == Weather.CONDITION_HEAVY_RAIN_SNOW
+         || c == Weather.CONDITION_CHANCE_OF_RAIN_SNOW || c == Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN_SNOW
+         || c == Weather.CONDITION_SLEET || c == Weather.CONDITION_ICE
+         || c == Weather.CONDITION_ICE_SNOW || c == Weather.CONDITION_HAIL
+         || c == Weather.CONDITION_FREEZING_RAIN) {
+            return 0xea73;
+        }
+        // rain / showers / drizzle -> cloud-rain
+        if (c == Weather.CONDITION_RAIN || c == Weather.CONDITION_LIGHT_RAIN
+         || c == Weather.CONDITION_HEAVY_RAIN || c == Weather.CONDITION_SHOWERS
+         || c == Weather.CONDITION_LIGHT_SHOWERS || c == Weather.CONDITION_HEAVY_SHOWERS
+         || c == Weather.CONDITION_SCATTERED_SHOWERS || c == Weather.CONDITION_CHANCE_OF_SHOWERS
+         || c == Weather.CONDITION_DRIZZLE || c == Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN
+         || c == Weather.CONDITION_UNKNOWN_PRECIPITATION) {
+            return 0xea72;
+        }
+        // fog / haze / smoke / dust -> cloud-fog
+        if (c == Weather.CONDITION_FOG || c == Weather.CONDITION_HAZY || c == Weather.CONDITION_HAZE
+         || c == Weather.CONDITION_MIST || c == Weather.CONDITION_SMOKE || c == Weather.CONDITION_DUST
+         || c == Weather.CONDITION_SAND || c == Weather.CONDITION_SANDSTORM
+         || c == Weather.CONDITION_VOLCANIC_ASH) {
+            return 0xecd9;
+        }
+        // windy -> wind
+        if (c == Weather.CONDITION_WINDY || c == Weather.CONDITION_SQUALL) {
+            return 0xec34;
+        }
+        // everything cloudy (and unknown) -> cloud
+        return 0xea76;
     }
 
     private function labelFont() as Graphics.FontType {
