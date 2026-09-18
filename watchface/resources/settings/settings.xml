@@ -1,0 +1,5 @@
+<settings>
+    <setting propertyKey="@Properties.ShowSeconds" title="@Strings.showSecondsTitle">
+        <settingConfig type="boolean" />
+    </setting>
+</settings>
