@@ -63,7 +63,35 @@ connect attempt does not retry. So:
 
 Clicking Start first connects to nothing and looks identical to a broken bridge.
 
+## Complications
+
+The three meters are also published as watchface complications (ids 0/1/2 in
+`resources/complications.xml`, public access so any watchface incl. Face It can show them).
+Each is a percentage with a short label and colour-zone ranges; the reset time does not fit
+a complication slot and stays in the glance.
+
+**Publishing must run from a background service.** A device app that calls
+`Complications.updateComplication()` from the foreground faults with an *uncatchable*
+"Illegal Access (Out of Bounds)" - confirmed, and confirmed on the Garmin forums. So
+`BackgroundService.mc` publishes on a temporal event (Connect IQ's 5-minute floor), which
+the app registers in `onStart`. The values are whatever the phone last pushed into Storage.
+
+Open the app once after install so `onStart` registers the temporal event; from then on the
+background service republishes every ~5 minutes.
+
+> Not verifiable in the headless simulator (the sim can't be driven to its
+> Simulation > Complications viewer here, and foreground publishing faults by design).
+> Confirm on a real watch by adding a Claude complication to a watchface.
+
 ## Layout note
 
 Glance code is compiled into its own restricted memory space, so `Snapshot` and the glance
-view are annotated `(:glance)`. Anything the glance touches needs that annotation.
+view are annotated `(:glance)`. `Snapshot`, `Publisher` and the background service are also
+`(:background)` because the complication publish runs in the background context. Anything
+those contexts touch needs the matching annotation.
+
+## Cutting a release
+
+The watch version is a manual constant in `source/Version.mc` (the `.prg` is built locally,
+not by CI). Bump it to the release version, rebuild `dist/` with `monkeyc -r`, and attach the
+`.prg` files to the GitHub release alongside the APK.

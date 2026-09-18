@@ -7,7 +7,7 @@ import Toybox.Lang;
 //! locally, so this is a manual constant. BUMP IT to the release version whenever the .prg
 //! is rebuilt for a release - it is the one thing to remember when cutting a release that
 //! ships a new watch binary. Annotated (:glance) because the glance reads it.
-(:glance)
+(:glance :background)
 module Version {
-    const APP = "1.7";
+    const APP = "1.8";
 }
