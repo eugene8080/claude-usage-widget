@@ -61,6 +61,11 @@ class ClaudeUsageView extends WatchUi.View {
             dc.drawText(cx, h * 0.83, Graphics.FONT_XTINY, "not updated recently",
                 Graphics.TEXT_JUSTIFY_CENTER);
         }
+
+        // Version at the bottom, dim - the watch app's own, so a sideload can be confirmed.
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(cx, h * 0.90, Graphics.FONT_XTINY, "v" + Version.APP,
+            Graphics.TEXT_JUSTIFY_CENTER);
     }
 
     //! One window: "5H  37%   3h" over a progress bar.

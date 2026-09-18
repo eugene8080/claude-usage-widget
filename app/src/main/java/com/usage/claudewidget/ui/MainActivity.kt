@@ -67,6 +67,13 @@ private fun SetupScreen() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Claude Usage Widget", style = MaterialTheme.typography.headlineSmall)
+        // The definitive "did it update?" check. VERSION_NAME is the release tag in a
+        // published build (a local debug build shows the gradle default instead).
+        Text(
+            "v${com.usage.claudewidget.BuildConfig.VERSION_NAME}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Text(status, style = MaterialTheme.typography.bodyMedium)
 
         Button(onClick = { loginLauncher.launch(Intent(context, LoginActivity::class.java)) }) {

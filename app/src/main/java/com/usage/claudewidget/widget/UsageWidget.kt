@@ -52,6 +52,7 @@ class UsageWidget : GlanceAppWidget() {
             modelWeeklyPct = s.modelWeeklyUtil.coerceAtLeast(0f).roundToInt(),
             modelWeeklyResets = TimeFmt.resetsAt(s.modelWeeklyReset, now, is24h),
             stale = TimeFmt.isStale(s.fetchedAt, now),
+            version = com.usage.claudewidget.BuildConfig.VERSION_NAME,
         )
     }
 
