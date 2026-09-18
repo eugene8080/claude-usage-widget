@@ -17,3 +17,7 @@ app/build/
 # Connect IQ build output
 watch/build/
 watch/dist/
+
+# Connect IQ watch face build output
+watchface/build/
+watchface/dist/

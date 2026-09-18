@@ -1,0 +1,6 @@
+<fonts>
+    <!-- JetBrains Mono, generated from the TTF into CIQ bitmap fonts. The text font carries
+         the full printable-ASCII set; the time font is digits + colon only, to stay small. -->
+    <font id="JBMono" filename="jbmono.fnt" />
+    <font id="JBMonoTime" filename="jbmono_time.fnt" />
+</fonts>

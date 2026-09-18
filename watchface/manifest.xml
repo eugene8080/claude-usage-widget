@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <!--
+      A terminal/CLI-styled watch face for Claude usage, modelled on the "Agentic Pro" look.
+      It draws the time plus the three usage meters, which it reads by SUBSCRIBING to the
+      complications the companion watch-app (Claude Usage) publishes - a watch face cannot
+      read another app's storage or receive phone pushes itself, so complications are the
+      sanctioned channel. minApiLevel 4.2.0 is the Complications floor; every fenix 8 class
+      target is on CIQ 6.x.
+    -->
+    <iq:application
+        entry="ClaudeFaceApp"
+        id="c9976145d8714b17a4d0f604f2276fd1"
+        launcherIcon="@Drawables.LauncherIcon"
+        minApiLevel="4.2.0"
+        name="@Strings.AppName"
+        type="watchface">
+
+        <iq:products>
+            <iq:product id="fenix843mm"/>
+            <iq:product id="fenix847mm"/>
+            <iq:product id="fenix8pro47mm"/>
+            <iq:product id="fenix8solar47mm"/>
+            <iq:product id="fenix8solar51mm"/>
+        </iq:products>
+
+        <iq:permissions>
+            <!-- Read the meters from the complications the companion app publishes. -->
+            <iq:uses-permission id="ComplicationSubscriber"/>
+        </iq:permissions>
+
+        <iq:languages>
+            <iq:language>eng</iq:language>
+        </iq:languages>
+    </iq:application>
+</iq:manifest>
