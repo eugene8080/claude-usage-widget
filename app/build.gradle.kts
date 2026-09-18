@@ -26,7 +26,10 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 3
-        versionName = "1.0"
+        // CI overwrites this with the release tag (see .github/workflows/build.yml). The
+        // default is "dev" rather than a number so a locally-built APK is unmistakably not a
+        // release when its version is shown in the app / widget / on the watch.
+        versionName = "dev"
 
         // Point the Connect IQ SDK at the simulator instead of a real watch:
         //   ./gradlew assembleDebug -PciqTethered=true

@@ -27,6 +27,14 @@ class ClaudeUsageGlanceView extends WatchUi.GlanceView {
         var w = dc.getWidth();
         var h = dc.getHeight();
 
+        // Version at the top-centre. That strip is otherwise empty (the labels were pushed
+        // down to clear the bezel) and the centre column is the one part of the top the round
+        // screen does not clip, so it costs no layout room. Dim, so it never competes with
+        // the numbers. Shown even in the empty state below.
+        dc.setColor(Graphics.COLOR_DK_GRAY, Graphics.COLOR_TRANSPARENT);
+        dc.drawText(w / 2, 0, Graphics.FONT_XTINY, "v" + Version.APP,
+            Graphics.TEXT_JUSTIFY_CENTER);
+
         if (!Snapshot.hasData()) {
             drawCentered(dc, w, h, "Open on phone");
             return;

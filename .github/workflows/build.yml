@@ -121,6 +121,10 @@ jobs:
             cp app/build/outputs/apk/debug/app-debug.apk claude-usage-widget.apk
             echo "signing=the debug key (no signing secrets configured)" >> "$GITHUB_OUTPUT"
           fi
+          # Two copies of the same APK: the stable name is what the README's
+          # releases/latest/download button resolves to, and the versioned name lets a
+          # downloaded file identify its release on sight (claude-usage-widget-v1.7.apk).
+          cp claude-usage-widget.apk "claude-usage-widget-${RELEASE_TAG}.apk"
 
       - name: Publish the release
         if: env.RELEASE_TAG != ''
@@ -133,9 +137,9 @@ jobs:
           # be pushed from a checkout; re-running against an existing one just replaces
           # the asset rather than failing.
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" claude-usage-widget.apk --clobber
+            gh release upload "$tag" claude-usage-widget.apk "claude-usage-widget-${tag}.apk" --clobber
           else
-            gh release create "$tag" claude-usage-widget.apk \
+            gh release create "$tag" claude-usage-widget.apk "claude-usage-widget-${tag}.apk" \
               --title "$tag" --target "$GITHUB_SHA" --generate-notes
           fi
           gh release edit "$tag" --notes "$(gh release view "$tag" --json body --jq .body)

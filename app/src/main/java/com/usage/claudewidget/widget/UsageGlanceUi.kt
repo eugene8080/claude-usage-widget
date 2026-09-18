@@ -49,6 +49,8 @@ data class WidgetState(
     val modelWeeklyPct: Int,
     val modelWeeklyResets: String,
     val stale: Boolean,
+    /** App version (release tag), shown so an update can be confirmed at a glance. */
+    val version: String,
 )
 
 private val COMPACT_MAX_WIDTH = 130.dp
@@ -107,7 +109,10 @@ fun UsageWidgetContent(state: WidgetState) {
 private fun FullLayout(s: WidgetState, showMark: Boolean, showResetPrefix: Boolean) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
         if (showMark) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = GlanceModifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 ClaudeMark(22.dp)
                 Spacer(GlanceModifier.width(6.dp))
                 Text(
@@ -116,6 +121,17 @@ private fun FullLayout(s: WidgetState, showMark: Boolean, showResetPrefix: Boole
                         color = GlanceTheme.colors.onSurface,
                         fontWeight = FontWeight.Medium,
                     ),
+                )
+                Spacer(GlanceModifier.defaultWeight())
+                // Version at the right of the header, so an update is confirmable on the
+                // widget itself without opening the app.
+                Text(
+                    "v${s.version}",
+                    style = TextStyle(
+                        color = GlanceTheme.colors.onSurfaceVariant,
+                        fontSize = 11.sp,
+                    ),
+                    maxLines = 1,
                 )
             }
             Spacer(GlanceModifier.height(8.dp))
