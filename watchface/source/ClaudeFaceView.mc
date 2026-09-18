@@ -134,10 +134,10 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         dc.clear();
         var cx = w / 2;
 
-        // Header prompt, Claude orange.
+        // Header prompt, Claude orange. Kept short so it clears the round bezel at the top of
+        // the screen (its narrowest point) - the full "claude@tactix ~ %" was cut off there.
         dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h * 0.09, ft(), "claude@tactix ~ %",
-            Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(cx, h * 0.10, ft(), "claude ~ %", Graphics.TEXT_JUSTIFY_CENTER);
 
         drawTime(dc, cx, h);
 
