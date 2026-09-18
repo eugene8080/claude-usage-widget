@@ -13,7 +13,8 @@ import Toybox.Time.Gregorian;
 //!
 //! Annotated (:glance) because the glance view reads it, and glance code is compiled into its
 //! own tightly budgeted memory space - anything it touches has to be declared part of it.
-(:glance)
+//! Also (:background) because the complication publisher reads it from the background service.
+(:glance :background)
 module Snapshot {
 
     // Storage keys are deliberately terse: they are also the keys of the BLE payload, and a

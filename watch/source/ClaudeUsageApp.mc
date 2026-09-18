@@ -1,6 +1,9 @@
 import Toybox.Application;
+import Toybox.Background;
 import Toybox.Communications;
 import Toybox.Lang;
+import Toybox.System;
+import Toybox.Time;
 import Toybox.WatchUi;
 
 //! Claude usage on the wrist, fed entirely by the Android companion app over BLE.
@@ -26,9 +29,30 @@ class ClaudeUsageApp extends Application.AppBase {
     }
 
     public function onStart(state as Dictionary?) as Void {
+        registerComplicationPublishing();
     }
 
     public function onStop(state as Dictionary?) as Void {
+    }
+
+    //! The background service that publishes the complications. Returning it here is what
+    //! lets the system run onTemporalEvent() when the app is closed.
+    public function getServiceDelegate() as [System.ServiceDelegate] {
+        return [new $.ClaudeUsageServiceDelegate()];
+    }
+
+    //! Ask the system to run the background publish every 5 minutes (the platform minimum).
+    //! Registering is idempotent enough to redo on each launch; the InvalidBackgroundTime
+    //! case only happens if a prior event ran too recently, which is harmless to skip.
+    private function registerComplicationPublishing() as Void {
+        if (!(Toybox has :Background)) {
+            return;
+        }
+        try {
+            Background.registerForTemporalEvent(new Time.Duration(5 * 60));
+        } catch (e instanceof Background.InvalidBackgroundTimeException) {
+            // Too soon since the last event - it will fire on the already-scheduled slot.
+        }
     }
 
     public function getInitialView() as [Views] or [Views, InputDelegates] {

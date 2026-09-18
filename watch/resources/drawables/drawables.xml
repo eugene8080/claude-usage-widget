@@ -1,0 +1,5 @@
+<drawables>
+    <!-- SVG because a public/protected complication icon must be one. Size-independent, so
+         it lives in the shared resources folder, not the per-device ones. -->
+    <bitmap id="ComplicationIcon" filename="complication_icon.svg" />
+</drawables>
