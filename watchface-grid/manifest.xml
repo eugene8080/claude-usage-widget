@@ -1,18 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
     <!--
-      "Claude Grid" - an Iron Grit-style data face: big time, date, weekday strip, a battery
-      arc, and eight data-field positions, all in JetBrains Mono. A separate app from the
-      "Claude Terminal" face so either can be worn and this one is fully revertable.
+      "Claude Grid" - an Iron Grit-style data face: big stacked time, date, weekday strip, a
+      battery arc, a live seconds sub-dial, and seven user-editable data fields, all in Chakra
+      Petch. A separate app from the "Claude Terminal" face so either can be worn and this one
+      is fully revertable.
 
-      This first version lays out the grid with representative values. Making the eight fields
-      user-editable via Garmin's native complication editor (API 5.1.0) is the next step.
+      The seven data fields (Data 01-06, 08) are complication slots the user assigns with
+      Garmin's native on-device watch face editor (API 5.1.0); Data 07 is the fixed seconds
+      dial. Accent and data colours are also editable natively. Requires ComplicationSubscriber.
     -->
     <iq:application
         entry="ClaudeGridApp"
         id="484bb3405cb84a94953d3284a6c58b61"
         launcherIcon="@Drawables.LauncherIcon"
-        minApiLevel="3.3.0"
+        minApiLevel="5.1.0"
         name="@Strings.AppName"
         type="watchface">
 
@@ -24,7 +26,9 @@
             <iq:product id="fenix8solar51mm"/>
         </iq:products>
 
-        <iq:permissions/>
+        <iq:permissions>
+            <iq:uses-permission id="ComplicationSubscriber"/>
+        </iq:permissions>
 
         <iq:languages>
             <iq:language>eng</iq:language>

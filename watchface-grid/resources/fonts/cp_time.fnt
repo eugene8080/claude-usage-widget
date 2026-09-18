@@ -1,0 +1,14 @@
+info face="Chakra Petch" size=120 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1 outline=0
+common lineHeight=157 base=120 scaleW=512 scaleH=512 pages=1 packed=0 alphaChnl=1 redChnl=0 greenChnl=0 blueChnl=0
+page id=0 file="cp_time_0.png"
+chars count=10
+char id=48 x=1 y=37 width=77 height=84 xoffset=0 yoffset=36 xadvance=77 page=0 chnl=15
+char id=49 x=82 y=37 width=45 height=84 xoffset=0 yoffset=36 xadvance=45 page=0 chnl=15
+char id=50 x=163 y=37 width=68 height=84 xoffset=0 yoffset=36 xadvance=68 page=0 chnl=15
+char id=51 x=244 y=37 width=72 height=84 xoffset=0 yoffset=36 xadvance=72 page=0 chnl=15
+char id=52 x=325 y=37 width=69 height=84 xoffset=0 yoffset=36 xadvance=69 page=0 chnl=15
+char id=53 x=406 y=37 width=72 height=84 xoffset=0 yoffset=36 xadvance=72 page=0 chnl=15
+char id=54 x=1 y=198 width=74 height=84 xoffset=0 yoffset=36 xadvance=74 page=0 chnl=15
+char id=55 x=82 y=198 width=62 height=84 xoffset=0 yoffset=36 xadvance=62 page=0 chnl=15
+char id=56 x=163 y=198 width=76 height=84 xoffset=0 yoffset=36 xadvance=76 page=0 chnl=15
+char id=57 x=244 y=198 width=75 height=84 xoffset=0 yoffset=36 xadvance=75 page=0 chnl=15

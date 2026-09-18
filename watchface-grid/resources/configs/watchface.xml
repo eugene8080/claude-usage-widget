@@ -1,0 +1,28 @@
+<resources xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://developer.garmin.com/downloads/connect-iq/resources.xsd">
+    <!--
+      Native on-device watch face editor config (API 5.1.0). Seven complication slots whose
+      ids match the Iron Grit "Data" numbers (07 is the fixed seconds dial, so it is absent).
+      allowAny lets the user drop ANY system or Connect IQ complication into a slot (including
+      the Claude usage complications published by the "Claude Terminal" companion app). The
+      per-slot sensible default type is chosen in code (ClaudeGridView), not here, because
+      allowAny slots may hand back a null complicationId until the user picks one.
+    -->
+    <watchface-config>
+        <data>
+            <complication id="1" allowAny="true"/>  <!-- Data 01: top,        default battery      -->
+            <complication id="2" allowAny="true"/>  <!-- Data 02: upper-left,  default steps        -->
+            <complication id="3" allowAny="true"/>  <!-- Data 03: upper-right, default VO2 max (run) -->
+            <complication id="4" allowAny="true"/>  <!-- Data 04: mid-left ring,  default heart rate -->
+            <complication id="5" allowAny="true"/>  <!-- Data 05: mid-right ring, default body battery -->
+            <complication id="6" allowAny="true"/>  <!-- Data 06: lower-left,  default pressure     -->
+            <complication id="8" allowAny="true"/>  <!-- Data 08: lower-right, default temperature  -->
+        </data>
+        <dataColors>
+            <color label="@Strings.colPeach" default="true">0xFFA480</color>
+            <color label="@Strings.colWhite">0xFFFFFF</color>
+            <color label="@Strings.colOrange">0xE95625</color>
+            <color label="@Strings.colGray">0xC0C0C0</color>
+        </dataColors>
+        <accentColors allowAny="true"/>
+    </watchface-config>
+</resources>
