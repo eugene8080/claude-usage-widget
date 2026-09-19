@@ -466,8 +466,10 @@ class ClaudeGridView extends WatchUi.WatchFace {
             var y = cy - r * Math.sin(a);
             dc.setColor((i == today - 1) ? _accentColor : TEXT3, Graphics.COLOR_TRANSPARENT);
             if (_fWeekVec != null) {
+                // NOTE: on the real tactix 8, drawAngledText rotates OPPOSITE to the simulator;
+                // (aDeg - 270) is what points the letters INWARD on-device (verified on-wrist).
                 dc.drawAngledText(x, y, _fWeekVec, letters[i],
-                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER, 270.0 - aDeg);
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER, aDeg - 270.0);
             } else {
                 dc.drawText(x, y, wf, letters[i],
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
