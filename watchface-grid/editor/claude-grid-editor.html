@@ -90,9 +90,9 @@ const COMPS=[
 ];
 const SEC_IDX=21;
 function defaults(){return {font:"Chivo Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",
-  arc:{span:74,dashW:10,dashLen:15,frac:0.5,rad:228},
+  arc:{span:65,dashW:10,dashLen:15,frac:0.5,rad:228},
   el:{
-  batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:22,num:24,sym:24},
+  batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:24,num:24,sym:24},
   d02:{name:"Data 02 (upper-left)",kind:"chip",x:0.166,y:0.299,comp:7,num:30,sym:24},
   d03:{name:"Data 03 (upper-right)",kind:"chip",x:0.834,y:0.299,comp:1,num:30,sym:24},
   d04:{name:"Data 04 (left ring)",kind:"ring",x:0.135,y:0.500,comp:22,ring:56,num:36,sym:24,frac:0.53},
@@ -101,10 +101,10 @@ function defaults(){return {font:"Chivo Mono",accent:"#ff531a",text1:"#ff9c75",t
   d08:{name:"Data 07 (lower-right)",kind:"chip",x:0.834,y:0.724,comp:25,num:30,sym:24},
   sec:{name:"Data 08 (dial)",kind:"tick",x:0.500,y:0.832,comp:SEC_IDX,ring:50,num:30,sym:24,frac:0.63},
   time:{name:"Time",kind:"time",x:0.500,y:0.500,gap:56,num:139,fade:0.44},
-  brand:{name:"Brand text",kind:"brand",x:0.500,y:0.169,num:31,text:"TACTIX"},
+  brand:{name:"Brand text",kind:"brand",x:0.500,y:0.169,num:36,text:"TACTIX"},
   alarmi:{name:"Alarm indicator",kind:"ind",x:0.166,y:0.169,sym:22,ic:0xea04},
   swatch:{name:"Stopwatch indicator",kind:"ind",x:0.834,y:0.169,sym:22,ic:0xff9b},
-  date:{name:"Date",kind:"date",x:0.500,y:0.832,num:30,gap:81},
+  date:{name:"Date",kind:"date",x:0.500,y:0.832,num:37,gap:81},
   week:{name:"Week",kind:"week",x:0.500,y:0.980,num:27,span:52},
 }};}
 let P=defaults(), sel=null, guide=null, boxes={}, lowPower=false;
