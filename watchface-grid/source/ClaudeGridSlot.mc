@@ -27,6 +27,7 @@ class ClaudeGridSlot extends WatchUi.Drawable {
     public var ringR as Number;
     public var ringPen as Number;
     public var striped as Boolean;
+    public var horizontal as Boolean = false;  // battery: icon beside the value on one row
 
     public var label as String = "";
     public var value as String = "--";     // single-line reading
@@ -63,6 +64,7 @@ class ClaudeGridSlot extends WatchUi.Drawable {
         ringR = opts.hasKey(:ringR) ? opts[:ringR] : 0;
         ringPen = opts.hasKey(:ringPen) ? opts[:ringPen] : 6;
         striped = opts.hasKey(:striped) ? opts[:striped] : false;
+        horizontal = opts.hasKey(:horizontal) ? opts[:horizontal] : false;
         _fLabel = opts[:fLabel];
         _fIcon = opts[:fIcon];
         _valueFonts = opts[:valueFonts];
@@ -120,6 +122,21 @@ class ClaudeGridSlot extends WatchUi.Drawable {
             dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
             dc.drawText(cx, cy + _RING_VALUE_DY, pickFont(dc, value), value,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+        } else if (horizontal) {
+            // Battery-style: icon and value on one row, the pair centred on cx.
+            var vf = pickFont(dc, value);
+            var vw = dc.getTextWidthInPixels(value, vf);
+            var iw = hasIcon ? dc.getTextWidthInPixels(iconChar, _fIcon) : 0;
+            var gap = (iw > 0) ? 7 : 0;
+            var sx = cx - (iw + gap + vw) / 2;
+            if (iw > 0) {
+                dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
+                dc.drawText(sx, cy, _fIcon, iconChar,
+                    Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
+            dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
+            dc.drawText(sx + iw + gap, cy, vf, value,
+                Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         } else if (stacked) {
             drawMarker(dc, cx, cy - _CHIP_STACK_DY);
             dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);

@@ -104,23 +104,37 @@ class ClaudeGridView extends WatchUi.WatchFace {
 
         _slots = [];
         _slotIds = {};
+        var cxf = w / 2.0;
+        var cyf = h / 2.0;
+        var R = w / 2.0;
         for (var i = 0; i < specs.size(); i++) {
             var s = specs[i];
             var uid = s[0] as Number;
             var isRing = (s[1] == SlotKind.RING);
+            var slotX = s[2] * w;
+            // Width budget that respects the round bezel: half-chord of the screen at this row,
+            // measured from the slot centre to the NEAR edge, so edge fields (pressure) shrink
+            // enough not to be clipped.
+            var dyy = (s[3] * h) - cyf;
+            var chordArg = (R * R) - (dyy * dyy);
+            var chordHalf = (chordArg > 0) ? Math.sqrt(chordArg) : 0.0;
+            var near = (slotX <= cxf) ? (slotX - (cxf - chordHalf)) : ((cxf + chordHalf) - slotX);
+            var maxW = isRing ? (s[4] * 1.6).toNumber() : (2.0 * (near - 8)).toNumber();
+            if (maxW < 40) { maxW = 40; }
             var slot = new ClaudeGridSlot({
                 :uid => uid,
                 :kind => s[1],
-                :cx => (s[2] * w).toNumber(),
+                :cx => slotX.toNumber(),
                 :cy => (s[3] * h).toNumber(),
                 :ringR => s[4],
                 :ringPen => s[5],
                 :striped => s[6],
+                :horizontal => (uid == 1),
                 :fLabel => _fLabel,
                 :fIcon => _fIcon,
                 :valueFonts => (isRing ? [_fRing, _fSmall] : [_fValue, _fSmall, _fLabel]),
                 :fStacked => _fSmall,
-                :valueMaxW => (isRing ? (s[4] * 1.6).toNumber() : (w * 0.22).toNumber())
+                :valueMaxW => maxW
             });
             slot.labelColor = DIM;
             slot.valueColor = _dataColor;
@@ -151,9 +165,17 @@ class ClaudeGridView extends WatchUi.WatchFace {
             if (lbl == null) { lbl = c.longLabel; }
             if (lbl == null) { lbl = defaultLabel(uid); }
             slot.label = (lbl as String).toUpper();
-            var vs = valStr(c.value);
-            // The Claude usage meters are percent-used - show a "%".
-            if ((c.value != null) && isPercentUsage(t, c.longLabel)) {
+            var raw = c.value;
+            // Sea-level pressure arrives in Pa (~101000); show hPa/mb to match the label and fit.
+            if ((t == Complications.COMPLICATION_TYPE_SEA_LEVEL_PRESSURE) && (raw != null)
+                && (raw instanceof Lang.Number || raw instanceof Lang.Float || raw instanceof Lang.Double)
+                && (raw > 2000)) {
+                raw = (raw / 100.0 + 0.5).toNumber();
+            }
+            var vs = valStr(raw);
+            // Battery and the Claude usage meters are percentages - show a "%".
+            if ((c.value != null) && (isPercentUsage(t, c.longLabel)
+                    || (t == Complications.COMPLICATION_TYPE_BATTERY))) {
                 vs = vs + "%";
             }
             // High/low temperature stacks (high over low) instead of one wide line.
