@@ -125,7 +125,14 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         _pcts[slot] = (v instanceof Number) ? v : -1;
         var sl = comp.shortLabel;
         if (sl != null) {
-            _labels[slot] = sl as String;
+            // Keep labels to 2 chars, uppercased, so a long model name ("Fable") shows as "FA"
+            // and never overruns into the bar. "5H"/"1W" are unchanged.
+            var s = sl as String;
+            if (s.length() > 2) {
+                var sub = s.substring(0, 2);
+                if (sub != null) { s = sub; }
+            }
+            _labels[slot] = s.toUpper();
         }
         // The reset epoch rides in `unit` as a numeric string.
         _resets[slot] = parseEpoch(comp.unit);
