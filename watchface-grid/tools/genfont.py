@@ -15,12 +15,27 @@ import sys
 from PIL import Image, ImageFont, ImageDraw
 
 
-def generate(ttf, out_base, size, chars, atlas_w=256, face_name="Chakra Petch"):
+def generate(ttf, out_base, size, chars, atlas_w=256, face_name="Chakra Petch",
+             weight=None, stroke=0):
+    """Rasterise `chars` from `ttf` at `size` into a BMFont atlas.
+
+    weight: for a variable font, the wght axis value (e.g. 500). Ignored for static TTFs.
+    stroke: if > 0, draw hollow OUTLINE glyphs (px stroke, transparent interior) instead of
+            solid fills - used for the always-on time. The glyph region is expanded by the
+            stroke so the outline is never clipped, and xoffset/yoffset shift back by the same
+            amount so an outlined glyph lands exactly where its solid twin would.
+    """
     font = ImageFont.truetype(ttf, size)
+    if weight is not None:
+        try:
+            font.set_variation_by_axes([weight])
+        except Exception as ex:
+            print("  (weight axis unavailable: %s)" % ex)
     ascent, descent = font.getmetrics()
     line_h = ascent + descent
 
-    pad = 1
+    sw = int(stroke)
+    pad = 1 + sw
     # Uniform grid cell sized to the widest glyph in the set (keeps packing trivial); each
     # glyph still records its OWN xadvance below, so rendered spacing stays proportional.
     max_w = 0
@@ -46,14 +61,19 @@ def generate(ttf, out_base, size, chars, atlas_w=256, face_name="Chakra Petch"):
         row = i // cols
         gx = col * cell_w + pad
         gy = row * cell_h + pad
-        draw.text((gx, gy), ch, font=font, fill=(255, 255, 255, 255))
+        if sw > 0:
+            # hollow: transparent fill, opaque stroke -> outline only
+            draw.text((gx, gy), ch, font=font, fill=(255, 255, 255, 0),
+                      stroke_width=sw, stroke_fill=(255, 255, 255, 255))
+        else:
+            draw.text((gx, gy), ch, font=font, fill=(255, 255, 255, 255))
         x0, y0, x1, y1 = font.getbbox(ch)
-        gw = max(0, x1 - x0)
-        gh = max(0, y1 - y0)
+        gw = max(0, x1 - x0) + 2 * sw
+        gh = max(0, y1 - y0) + 2 * sw
         adv = int(round(font.getlength(ch)))
         lines.append(
             "char id=%d x=%d y=%d width=%d height=%d xoffset=%d yoffset=%d xadvance=%d page=0 chnl=15"
-            % (ord(ch), gx + x0, gy + y0, gw, gh, x0, y0, adv)
+            % (ord(ch), gx + x0 - sw, gy + y0 - sw, gw, gh, x0 - sw, y0 - sw, adv)
         )
 
     atlas.save(out_base + "_0.png")
