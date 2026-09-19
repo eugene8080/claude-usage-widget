@@ -39,6 +39,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private var _fWeek as Graphics.FontType?;    // 27px          - weekday letters
     private var _fSmall as Graphics.FontType?;   // 24px          - battery %, SEC, text labels
     private var _fIcon as Graphics.FontType?;    // 24px          - Tabler per-field icons
+    private var _fWeekVec as Graphics.VectorFont?; // vector font  - weekday strip (rotatable)
 
     private var _editMode as Boolean = false;
     private var _lowPower as Boolean = false;    // always-on / ambient mode
@@ -74,6 +75,14 @@ class ClaudeGridView extends WatchUi.WatchFace {
         _fWeek  = WatchUi.loadResource(Rez.Fonts.CGWeek) as Graphics.FontType;
         _fSmall = WatchUi.loadResource(Rez.Fonts.CGSmall) as Graphics.FontType;
         _fIcon  = WatchUi.loadResource(Rez.Fonts.TablerIcon) as Graphics.FontType;
+
+        // A vector font for the weekday strip - the only way to draw ROTATED (curved) text on
+        // CIQ; bitmap fonts can't rotate. Guarded so older devices fall back to upright letters.
+        if (Graphics has :getVectorFont) {
+            _fWeekVec = Graphics.getVectorFont({
+                :face => ["RobotoCondensedBold", "RobotoCondensed"], :size => 26
+            });
+        }
 
         buildSlots(dc.getWidth(), dc.getHeight());
 
@@ -282,12 +291,15 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var h = dc.getHeight();
         var cx = w / 2;
         var cy = h / 2;
+        // Smooth the vector work (rings, battery-arc dashes, seconds ticks, curved weekday text);
+        // CIQ leaves anti-aliasing OFF by default, which is what makes diagonals look jagged/blobby.
+        if (dc has :setAntiAlias) { dc.setAntiAlias(true); }
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
 
-        // Battery arc on the bezel (always system battery).
-        var battery = System.getSystemStats().battery;
-        GridDraw.segmentArc(dc, cx, cy, cx - 3, 122.5, 57.5, 16, battery / 100.0, 10, 15);
+        // Arc on the bezel: gauges Data 01's percentage (e.g. Claude Fable 55%), falling back to
+        // the system battery when Data 01 isn't a 0-100 metric. Sweeps in with the rings on wake.
+        GridDraw.segmentArc(dc, cx, cy, cx - 3, 122.5, 57.5, 16, battArcFrac() * ringSweep, 10, 15);
 
         // The six editable slots (skip the one the editor is currently pulsing).
         for (var i = 0; i < _slots.size(); i++) {
@@ -440,18 +452,26 @@ class ClaudeGridView extends WatchUi.WatchFace {
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    //! Weekday letters curved along the bottom bezel (52 deg span centred on the bottom), today accent.
+    //! Weekday letters curved along the bottom bezel (52 deg span centred on the bottom), today
+    //! accent. Each letter is rotated tangent to the arc with drawAngledText (vector font); if no
+    //! vector font is available the bitmap letters are drawn upright as a fallback.
     private function drawWeekCurved(dc as Dc, cx as Numeric, cy as Numeric, r as Numeric) as Void {
         var letters = ["S", "M", "T", "W", "T", "F", "S"];
         var today = Gregorian.info(Time.now(), Time.FORMAT_SHORT).day_of_week; // 1=Sun..7=Sat
         var wf = (_fWeek != null) ? _fWeek : Graphics.FONT_XTINY;
         for (var i = 0; i < 7; i++) {
-            var a = (244.0 + (52.0 / 6.0) * i) * Math.PI / 180.0;
+            var aDeg = 244.0 + (52.0 / 6.0) * i;              // math degrees, 270 = bottom
+            var a = aDeg * Math.PI / 180.0;
             var x = cx + r * Math.cos(a);
             var y = cy - r * Math.sin(a);
             dc.setColor((i == today - 1) ? _accentColor : TEXT3, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(x, y, wf, letters[i],
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            if (_fWeekVec != null) {
+                dc.drawAngledText(x, y, _fWeekVec, letters[i],
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER, 270.0 - aDeg);
+            } else {
+                dc.drawText(x, y, wf, letters[i],
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            }
         }
     }
 
@@ -461,6 +481,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (_lowPower) { return; }
         var w = dc.getWidth();
         var h = dc.getHeight();
+        if (dc has :setAntiAlias) { dc.setAntiAlias(true); }
         var scx = w / 2;
         var scy = (h * 0.832).toNumber();
         var r = 50;
@@ -509,6 +530,40 @@ class ClaudeGridView extends WatchUi.WatchFace {
     }
 
     // ---- value helpers ----
+
+    //! Fill fraction for the top arc: Data 01's reading when it's a 0-100 percentage (battery, the
+    //! Claude usage meters, body battery, etc.), otherwise the system battery. Read fresh so the
+    //! arc tracks the live value and matches the numeric readout below it.
+    private function battArcFrac() as Float {
+        var id = _slotIds[1];
+        if (id != null) {
+            var cid = id as Complications.Id;
+            if (isPercentMetric(cid.getType())) {
+                try {
+                    var v = Complications.getComplication(cid).value;
+                    if (v instanceof Lang.Number || v instanceof Lang.Float
+                        || v instanceof Lang.Double || v instanceof Lang.Long) {
+                        var f = v.toFloat() / 100.0;
+                        if (f < 0.0) { f = 0.0; }
+                        if (f > 1.0) { f = 1.0; }
+                        return f;
+                    }
+                } catch (e) {
+                }
+            }
+        }
+        return System.getSystemStats().battery / 100.0;
+    }
+
+    //! Types whose value is a 0-100 percentage, so the arc can gauge them directly.
+    private function isPercentMetric(t as Complications.Type or Null) as Boolean {
+        return t == Complications.COMPLICATION_TYPE_BATTERY
+            || t == Complications.COMPLICATION_TYPE_BODY_BATTERY
+            || t == Complications.COMPLICATION_TYPE_PULSE_OX
+            || t == Complications.COMPLICATION_TYPE_STRESS
+            || t == Complications.COMPLICATION_TYPE_SLEEP_SCORE
+            || t == Complications.COMPLICATION_TYPE_INVALID;  // Claude usage meters (Fable/5h/1w)
+    }
 
     private function ringFrac(id as Complications.Id, v as Complications.Value or Null) as Float {
         var t = id.getType();

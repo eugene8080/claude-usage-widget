@@ -58,19 +58,32 @@ module GridDraw {
 
     //! Segmented arc between two math-degree angles (the battery indicator across the top bezel).
     //! `penW` is the dash thickness, `dashLen` how far each dash reaches inward from `r`.
+    //!
+    //! Each dash is a FILLED rectangle (fillPolygon), not a thick drawLine: CIQ renders wide short
+    //! lines with rounded/chunky caps, which read as blobs at this size. Building the quad from the
+    //! radial and its perpendicular keeps every dash a crisp rectangle at any angle.
     function segmentArc(dc as Dc, cx as Numeric, cy as Numeric, r as Numeric,
                         startDeg as Float, endDeg as Float, n as Number, frac as Float,
                         penW as Number, dashLen as Number) as Void {
         var lit = (n * frac).toNumber();
-        dc.setPenWidth(penW);
+        var hw = penW / 2.0;
         for (var i = 0; i < n; i++) {
             var a = (startDeg + (endDeg - startDeg) * i / (n - 1)) * Math.PI / 180.0;
             var ca = Math.cos(a);
             var sa = Math.sin(a);
+            // outer (r) and inner (r-dashLen) points on this radial; y is screen-down (cy - r*sa)
+            var ox = cx + r * ca;              var oy = cy - r * sa;
+            var ix = cx + (r - dashLen) * ca;  var iy = cy - (r - dashLen) * sa;
+            // unit perpendicular to the radial, scaled to half the dash width
+            var qx = sa * hw;                  var qy = ca * hw;
             dc.setColor(i < lit ? lerp(GRAD_A, GRAD_B, i.toFloat() / n) : TRACK,
                 Graphics.COLOR_TRANSPARENT);
-            dc.drawLine(cx + r * ca, cy - r * sa, cx + (r - dashLen) * ca, cy - (r - dashLen) * sa);
+            dc.fillPolygon([
+                [ox + qx, oy + qy],
+                [ox - qx, oy - qy],
+                [ix - qx, iy - qy],
+                [ix + qx, iy + qy]
+            ]);
         }
-        dc.setPenWidth(1);
     }
 }
