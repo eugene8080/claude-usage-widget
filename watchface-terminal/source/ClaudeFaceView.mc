@@ -9,21 +9,33 @@ import Toybox.WatchUi;
 
 //! The Claude terminal watch face.
 //!
-//! Layout, top to bottom on the round screen: a prompt/header line, the time, the date, then
-//! three CLI-style rows (5H / 1W / model) each with a bar, percentage, and reset time, and a
-//! blinking cursor. Dark background, Claude orange throughout the chrome.
+//! Layout comes straight from the HTML layout editor: a prompt line, the big time, the date, then
+//! three CLI-style rows (5H / 1W / model) each with a bar, percentage and reset time, and a
+//! blinking cursor. Dark background, Claude orange chrome, in Share Tech Mono.
 //!
-//! The values come from the published complications. We can't construct a custom
-//! complication's Id directly (its identity is an internal UUID), so onShow ENUMERATES the
-//! available complications, keeps the ones whose label marks them as ours, subscribes, and
-//! caches value + reset epoch; onComplicationChange refreshes the cache. The reset time is
-//! carried in the complication's `unit` field as raw epoch-seconds and formatted here.
+//! The values come from the published complications. We can't construct a custom complication's Id
+//! directly (its identity is an internal UUID), so onShow ENUMERATES the available complications,
+//! keeps the ones whose label marks them as ours, subscribes, and caches value + reset epoch;
+//! onComplicationChange refreshes the cache. The reset time is carried in the complication's `unit`
+//! field as raw epoch-seconds and formatted here.
 class ClaudeFaceView extends WatchUi.WatchFace {
 
-    private const ACCENT = 0xD97757;      // Claude orange - used for all chrome
-    private const TRACK = 0x333333;       // bar background
-    private const DIM = 0xAAAAAA;         // labels / secondary text
-    private const NEAR_CAP = 0xFF5F5F;    // 80%+ turns red
+    private const ACCENT = 0xD97757;      // Claude orange - prompt, bar fill, cursor
+    private const VALUE = 0xFFFFFF;       // time + percentage
+    private const TRACK = 0x333333;       // empty bar background
+    private const DIM = 0xAAAAAA;         // date, labels, reset times
+    private const NEAR_CAP = 0xFF5F5F;    // bar fill at 80%+
+
+    // --- layout (fractions of the screen), from the editor ---
+    private const PROMPT_X = 0.305;  private const PROMPT_Y = 0.177;
+    private const TIME_X = 0.402;    private const TIME_Y = 0.250;
+    private const DATE_X = 0.305;    private const DATE_Y = 0.454;
+    private const ROWS_Y = 0.556;    private const ROWS_GAP = 0.113;
+    private const LABEL_X = 0.148;   private const BAR_X = 0.242;   private const BAR_W = 0.287;
+    private const BAR_H = 0.030;     private const BAR_DY = 0.018;
+    private const PCT_X = 0.639;     private const RESET_X = 0.858;
+    private const CURSOR_X = 0.526;  private const CURSOR_Y = 0.469;
+    private const CURSOR_W = 0.030;  private const CURSOR_H = 0.028;
 
     // One cache slot per meter. pct is -1 until a value arrives; resetEpoch 0 means none.
     private var _labels as Array<String> = ["5H", "1W", "--"];
@@ -33,7 +45,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private var _subscribed as Boolean = false;
     private var _showSeconds as Boolean = false;
 
-    // JetBrains Mono, loaded from resources - the terminal typeface for every element.
+    // Share Tech Mono, loaded from resources - the terminal typeface for every element.
     private var _fontText as Graphics.FontType?;
     private var _fontTime as Graphics.FontType?;
 
@@ -42,11 +54,11 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     }
 
     public function onLayout(dc as Dc) as Void {
-        _fontText = WatchUi.loadResource(Rez.Fonts.JBMono) as Graphics.FontType;
-        _fontTime = WatchUi.loadResource(Rez.Fonts.JBMonoTime) as Graphics.FontType;
+        _fontText = WatchUi.loadResource(Rez.Fonts.STMono) as Graphics.FontType;
+        _fontTime = WatchUi.loadResource(Rez.Fonts.STMonoTime) as Graphics.FontType;
     }
 
-    //! JetBrains Mono for text, falling back to the system font if the resource ever fails.
+    //! Share Tech Mono for text, falling back to the system font if the resource ever fails.
     private function ft() as Graphics.FontType {
         return (_fontText != null) ? _fontText : Graphics.FONT_TINY;
     }
@@ -130,44 +142,42 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     public function onUpdate(dc as Dc) as Void {
         var w = dc.getWidth();
         var h = dc.getHeight();
+        if (dc has :setAntiAlias) { dc.setAntiAlias(true); }
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
-        var cx = w / 2;
 
-        // Header prompt, Claude orange. Kept short so it clears the round bezel at the top of
-        // the screen (its narrowest point) - the full "claude@tactix ~ %" was cut off there.
+        // Prompt line, Claude orange.
         dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h * 0.10, ft(), "claude ~ %", Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w * PROMPT_X, h * PROMPT_Y, ft(), "claude ~ %", Graphics.TEXT_JUSTIFY_CENTER);
 
-        drawTime(dc, cx, h);
+        drawTime(dc, w, h);
 
         // Date.
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         var dateStr = info.day_of_week + " " + info.month + " " + info.day.format("%d");
         dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(cx, h * 0.40, ft(), dateStr, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w * DATE_X, h * DATE_Y, ft(), dateStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Three CLI rows.
-        var rowY = [h * 0.54, h * 0.645, h * 0.75];
         for (var i = 0; i < 3; i++) {
-            drawRow(dc, i, w, rowY[i]);
+            drawRow(dc, i, w, h, ROWS_Y + ROWS_GAP * i);
         }
 
         // Blinking cursor.
         if (System.getClockTime().sec % 2 == 0) {
             dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(cx - (w * 0.01), h * 0.87, w * 0.03, h * 0.028);
+            dc.fillRectangle(w * CURSOR_X - w * CURSOR_W / 2.0, h * CURSOR_Y, w * CURSOR_W, h * CURSOR_H);
         }
     }
 
     //! Seconds tick here when the device allows partial updates; onUpdate handles the rest.
     public function onPartialUpdate(dc as Dc) as Void {
         if (_showSeconds) {
-            drawTime(dc, dc.getWidth() / 2, dc.getHeight());
+            drawTime(dc, dc.getWidth(), dc.getHeight());
         }
     }
 
-    private function drawTime(dc as Dc, cx as Numeric, h as Numeric) as Void {
+    private function drawTime(dc as Dc, w as Numeric, h as Numeric) as Void {
         var clock = System.getClockTime();
         var hour = clock.hour;
         if (!System.getDeviceSettings().is24Hour) {
@@ -178,45 +188,48 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         if (_showSeconds) {
             t += ":" + clock.sec.format("%02d");
         }
-        // Repaint the time band first so onPartialUpdate doesn't smear seconds.
+        // Repaint just the time band first so onPartialUpdate doesn't smear seconds (kept clear of
+        // the prompt above and the date below).
+        var ty = h * TIME_Y;
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(0, h * 0.14, dc.getWidth(), h * 0.24);
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(0, ty - 3, w, h * 0.200);
+        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
         var font = (_fontTime != null) ? _fontTime : Graphics.FONT_NUMBER_MEDIUM;
-        dc.drawText(cx, h * 0.17, font, t, Graphics.TEXT_JUSTIFY_CENTER);
+        dc.drawText(w * TIME_X, ty, font, t, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
-    //! One row: label, bar, percentage, reset time. Columns are fixed fractions of the width
-    //! so the three rows align and stay within the round bezel's safe band.
-    private function drawRow(dc as Dc, slot as Number, w as Numeric, y as Numeric) as Void {
+    //! One row: label, bar, percentage, reset time. Columns are fixed fractions of the width so the
+    //! three rows align and stay within the round bezel's safe band.
+    private function drawRow(dc as Dc, slot as Number, w as Numeric, h as Numeric, yf as Float) as Void {
+        var y = h * yf;
         var pct = _pcts[slot];
 
         dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w * 0.15, y, ft(), _labels[slot], Graphics.TEXT_JUSTIFY_LEFT);
+        dc.drawText(w * LABEL_X, y, ft(), _labels[slot], Graphics.TEXT_JUSTIFY_LEFT);
 
         // Bar.
-        var barLeft = w * 0.32;
-        var barW = w * 0.16;
-        var barY = y + (w * 0.018);
-        var barH = w * 0.035;
+        var bx = w * BAR_X;
+        var bw = w * BAR_W;
+        var by = y + w * BAR_DY;
+        var bh = w * BAR_H;
         dc.setColor(TRACK, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(barLeft, barY, barW, barH);
+        dc.fillRectangle(bx, by, bw, bh);
         if (pct >= 0) {
             var clamped = (pct > 100) ? 100 : pct;
             dc.setColor(pct >= 80 ? NEAR_CAP : ACCENT, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(barLeft, barY, barW * clamped / 100.0, barH);
+            dc.fillRectangle(bx, by, bw * clamped / 100.0, bh);
         }
 
         // Percentage.
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_TRANSPARENT);
+        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
         var pctTxt = (pct >= 0) ? (pct.toString() + "%") : "--";
-        dc.drawText(w * 0.65, y, ft(), pctTxt, Graphics.TEXT_JUSTIFY_RIGHT);
+        dc.drawText(w * PCT_X, y, ft(), pctTxt, Graphics.TEXT_JUSTIFY_RIGHT);
 
         // Reset time.
         var reset = resetsAt(_resets[slot]);
         if (!reset.equals("")) {
             dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w * 0.86, y, ft(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
+            dc.drawText(w * RESET_X, y, ft(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
         }
     }
 
