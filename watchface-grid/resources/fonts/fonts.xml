@@ -1,13 +1,14 @@
 <fonts>
-    <!-- Chakra Petch (SemiBold), generated from the TTF into CIQ bitmap fonts by
-         tools/build_fonts.py. Each carries only the glyphs its fields draw, so the big
-         sizes stay small: CPTime/CPRing are digits only; the rest add letters + symbols.
-         Sizes come straight from the layout editor's final scales. -->
-    <font id="CPTime"  filename="cp_time.fnt" />
-    <font id="CPRing"  filename="cp_ring.fnt" />
-    <font id="CPValue" filename="cp_value.fnt" />
-    <font id="CPSmall" filename="cp_small.fnt" />
-    <font id="CPLabel" filename="cp_label.fnt" />
+    <!-- Chivo Mono (Medium/500), generated from the variable TTF into CIQ bitmap fonts by
+         tools/build_fonts_chivo.py. Each carries only the glyphs its fields draw, so the big
+         sizes stay small: CGTime/CGTimeOutline are digits only. Sizes come straight from the
+         layout editor's final numbers. -->
+    <font id="CGTime"        filename="cg_time.fnt" />
+    <font id="CGTimeOutline" filename="cg_time_o.fnt" />
+    <font id="CGBig"         filename="cg_big.fnt" />
+    <font id="CGMed"         filename="cg_med.fnt" />
+    <font id="CGWeek"        filename="cg_week.fnt" />
+    <font id="CGSmall"       filename="cg_small.fnt" />
     <!-- Per-field icons from Tabler Icons (MIT), one glyph per complication type. -->
-    <font id="TablerIcon" filename="cp_icon.fnt" />
+    <font id="TablerIcon"    filename="cg_icon.fnt" />
 </fonts>
