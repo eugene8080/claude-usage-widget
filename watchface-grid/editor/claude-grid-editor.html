@@ -31,6 +31,7 @@
       <div class="row"><label style="flex:0 0 40px">Font</label><select id="fontSel"></select></div>
       <div class="row chk"><input type="checkbox" id="snap" checked><label style="flex:0 0 auto">Snap to align (vertical + horizontal)</label></div>
       <div class="row chk"><input type="checkbox" id="mir" checked><label style="flex:0 0 auto">Mirror left/right (position + sizes)</label></div>
+      <div class="row chk"><input type="checkbox" id="lowp"><label style="flex:0 0 auto">Low-power preview (always-on mode)</label></div>
     </div>
     <div class="panel">
       <h2>Selected: <span id="selName">- none -</span></h2>
@@ -55,6 +56,7 @@
       <div class="row"><label title="most values">Text 1</label><input type="color" id="cT1"><input type="text" id="cT1H" class="hex"></div>
       <div class="row"><label title="Data 04/05 + date">Text 2</label><input type="color" id="cT2"><input type="text" id="cT2H" class="hex"></div>
       <div class="row"><label title="icons, SEC, weekdays">Text 3</label><input type="color" id="cT3"><input type="text" id="cT3H" class="hex"></div>
+      <div class="row"><label title="hour digits (solid)">Hour</label><input type="color" id="cHc"><input type="text" id="cHcH" class="hex"></div>
       <div class="row"><label title="ring/arc gradient start">Gradient 1</label><input type="color" id="cG1"><input type="text" id="cG1H" class="hex"></div>
       <div class="row"><label title="ring/arc gradient end">Gradient 2</label><input type="color" id="cG2"><input type="text" id="cG2H" class="hex"></div>
     </div>
@@ -87,7 +89,7 @@ const COMPS=[
  {k:"Alt Time Zone",ic:0xeb54,v:"14:23",lb:"NY"},
 ];
 const SEC_IDX=21;
-function defaults(){return {font:"Commit Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",grad1:"#B5502F",grad2:"#FFC08A",
+function defaults(){return {font:"Commit Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#B5502F",grad2:"#FFC08A",
   arc:{span:75,dashW:10,dashLen:15,frac:0.5,rad:224},
   el:{
   batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:22,num:24,sym:24},
@@ -105,7 +107,7 @@ function defaults(){return {font:"Commit Mono",accent:"#ff531a",text1:"#ff9c75",
   date:{name:"Date",kind:"date",x:0.500,y:0.832,num:34,gap:76},
   week:{name:"Week",kind:"week",x:0.500,y:0.980,num:27,span:52},
 }};}
-let P=defaults(), sel=null, guide=null, boxes={};
+let P=defaults(), sel=null, guide=null, boxes={}, lowPower=false;
 const PAIR={d02:"d03",d03:"d02",d04:"d05",d05:"d04",d06:"d08",d08:"d06"};
 function mirror(k){ if(!document.getElementById("mir").checked)return; const q=PAIR[k]; if(!q)return; const a=P.el[k],b=P.el[q]; b.x=1-a.x; b.y=a.y; if(a.ring!=null)b.ring=a.ring; if(a.num!=null)b.num=a.num; if(a.sym!=null)b.sym=a.sym; }
 const ctx=document.getElementById("c").getContext("2d"), out=document.getElementById("out");
@@ -127,23 +129,24 @@ function battArc(){ const a=P.arc, r=a.rad, n=16, lit=Math.round(n*a.frac), st=9
 function tabular(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; let cw=0;
   for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2;
   for(let i=0;i<str.length;i++){ ctx.fillStyle=color; ctx.fillText(str[i],sx+cw*(i+0.5),y); } }
+function tabularStroke(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineWidth=Math.max(1.5,parseInt(f)*0.04); let cw=0; for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2; for(let i=0;i<str.length;i++){ ctx.strokeStyle=color; ctx.strokeText(str[i],sx+cw*(i+0.5),y); } }
 function symbol(e,x,y){ const c=COMPS[e.comp], s=e.sym;
   if(c && c.pox){ const rr=s*0.5; ctx.strokeStyle=P.text3; ctx.lineWidth=Math.max(1.5,s*0.07); ctx.beginPath(); ctx.arc(x,y,rr,0,2*Math.PI); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x-rr*0.72,y+rr*0.72); ctx.lineTo(x+rr*0.72,y-rr*0.72); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x-rr*0.5,y); ctx.lineTo(x-rr*0.18,y+rr*0.3); ctx.lineTo(x+rr*0.12,y-rr*0.25); ctx.lineTo(x+rr*0.45,y+rr*0.2); ctx.stroke(); return; }
   if(c && c.ic!=null){ const im=img(c.ic); if(im&&im.complete) tintIcon(im,x,y,s,P.text3); return; }
   ctx.fillStyle=P.text3; ctx.font=num(Math.round(s*0.72)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(c?c.lb:"",x,y); }
 function drawEl(k){ const e=P.el[k], x=e.x*SZ, y=e.y*SZ, c=COMPS[e.comp]; ctx.textAlign="center"; ctx.textBaseline="middle";
-  if(e.kind=="time"){ const f=num(e.num); const topY=y-e.gap-e.num*0.42, botY=y+e.gap+e.num*0.42; const g=ctx.createLinearGradient(0,topY,0,botY); const fw=Math.max(0.001,e.fade); g.addColorStop(0,P.grad1); g.addColorStop(Math.max(0,0.5-fw*0.5),P.grad1); g.addColorStop(Math.min(1,0.5+fw*0.5),P.grad2); g.addColorStop(1,P.grad2); tabular("01",x,y-e.gap,f,g); tabular("33",x,y+e.gap,f,g); boxes[k]=[x-72,y-e.gap-e.num*0.7,x+72,y+e.gap+e.num*0.7]; return; }
+  if(e.kind=="time"){ const f=num(e.num); const mmy=y+e.gap, topY=mmy-e.num*0.42, botY=mmy+e.num*0.42; const g=ctx.createLinearGradient(0,topY,0,botY); const fw=Math.max(0.001,e.fade); g.addColorStop(0,P.grad1); g.addColorStop(Math.max(0,0.5-fw*0.5),P.grad1); g.addColorStop(Math.min(1,0.5+fw*0.5),P.grad2); g.addColorStop(1,P.grad2); if(lowPower){ tabularStroke("01",x,y-e.gap,f,P.hourCol); tabularStroke("33",x,mmy,f,g); } else { tabular("01",x,y-e.gap,f,P.hourCol); tabular("33",x,mmy,f,g); } boxes[k]=[x-72,y-e.gap-e.num*0.7,x+72,y+e.gap+e.num*0.7]; return; }
   if(e.kind=="brand"){ ctx.fillStyle=P.text3; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(e.text,x,y); boxes[k]=[x-70,y-18,x+70,y+18]; return; }
   if(e.kind=="ind"){ const im=img(e.ic); if(im&&im.complete) tintIcon(im,x,y,e.sym,P.text3); boxes[k]=[x-e.sym/2-5,y-e.sym/2-5,x+e.sym/2+5,y+e.sym/2+5]; return; }
-  if(e.kind=="date"){ const d=e.gap; ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.fillText("SEP",x-d,y); ctx.fillText("19",x+d,y); boxes[k]=[x-d-42,y-24,x+d+42,y+24]; return; }
+  if(e.kind=="date"){ if(lowPower){ ctx.fillStyle=P.text2; ctx.font=num(Math.round(e.num*0.85)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("19",x,y-e.num*0.42); ctx.fillText("SEP",x,y+e.num*0.42); boxes[k]=[x-40,y-e.num*0.85,x+40,y+e.num*0.85]; return; } const d=e.gap; ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.fillText("SEP",x-d,y); ctx.fillText("19",x+d,y); boxes[k]=[x-d-42,y-24,x+d+42,y+24]; return; }
   if(e.kind=="week"){ const R=y-cy, sp=e.span, st=90+sp/2; ctx.font=num(e.num);
     for(let i=0;i<7;i++){ const th=(st-(sp/6)*i)*Math.PI/180, lx=cx+R*Math.cos(th), ly=cy+R*Math.sin(th);
       ctx.save(); ctx.translate(lx,ly); ctx.rotate(th-Math.PI/2); ctx.fillStyle=i==5?P.accent:P.text3; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("SMTWTFS"[i],0,0); ctx.restore(); }
     boxes[k]=[cx-110,y-26,cx+110,y+18]; return; }
   const isSec=c&&c.sec;
-  if(e.kind=="tick"){ const rr=e.ring; tickRing(x,y,rr,e.frac); symbol(e,x,y-rr*0.5);
+  if(e.kind=="tick"){ if(lowPower) return; const rr=e.ring; tickRing(x,y,rr,e.frac); symbol(e,x,y-rr*0.5);
     ctx.fillStyle=isSec?P.accent:P.text1; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(c?c.v:"",x,y+e.num*0.3); boxes[k]=[x-rr-4,y-rr-4,x+rr+4,y+rr+4]; return; }
-  if(e.kind=="ring"){ const rr=e.ring; ring(x,y,rr,6,e.frac,false); symbol(e,x,y-rr*0.42);
+  if(e.kind=="ring"){ const rr=e.ring; if(!lowPower) ring(x,y,rr,6,e.frac,false); symbol(e,x,y-rr*0.42);
     ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(c?c.v:"",x,y+e.num*0.28); boxes[k]=[x-rr-4,y-rr-4,x+rr+4,y+rr+4]; return; }
   if(e.kind=="horiz"){ ctx.font=num(e.num); const vw=ctx.measureText(c.v).width; let iw=0, lbl=null;
     if(c.ic!=null){ iw=e.sym; } else { lbl=c.lb; ctx.font=num(Math.round(e.sym*0.72)); iw=ctx.measureText(lbl).width; ctx.font=num(e.num); }
@@ -157,7 +160,7 @@ function drawEl(k){ const e=P.el[k], x=e.x*SZ, y=e.y*SZ, c=COMPS[e.comp]; ctx.te
   else { ctx.fillStyle=P.text1; ctx.font=num(e.num); ctx.fillText(c?c.v:"",x,y); }
   boxes[k]=[x-46,y-38,x+46,y+38];
 }
-function draw(){ ctx.fillStyle="#000"; ctx.fillRect(0,0,SZ,SZ); boxes={}; GA=hexRgb(P.grad1); GB=hexRgb(P.grad2); battArc();
+function draw(){ lowPower=document.getElementById("lowp").checked; ctx.fillStyle="#000"; ctx.fillRect(0,0,SZ,SZ); boxes={}; GA=hexRgb(P.grad1); GB=hexRgb(P.grad2); battArc();
   ["batt","d02","d03","d04","d05","d06","d08","sec","time","date","week","brand","alarmi","swatch"].forEach(drawEl);
   if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#E95625"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
@@ -217,13 +220,14 @@ function bindColor(pid,hid,set){ const p=document.getElementById(pid), h=documen
   p.oninput=()=>{ h.value=p.value; set(p.value); draw(); };
   h.oninput=()=>{ let v=h.value.trim(); if(!/^#/.test(v)) v="#"+v; if(/^#[0-9a-fA-F]{6}$/.test(v)){ p.value=v; set(v); draw(); } }; }
 bindColor("cAcc","cAccH",v=>P.accent=v); bindColor("cT1","cT1H",v=>P.text1=v); bindColor("cT2","cT2H",v=>P.text2=v);
-bindColor("cT3","cT3H",v=>P.text3=v);
+bindColor("cT3","cT3H",v=>P.text3=v); bindColor("cHc","cHcH",v=>P.hourCol=v);
 bindColor("cG1","cG1H",v=>P.grad1=v); bindColor("cG2","cG2H",v=>P.grad2=v);
 document.getElementById("brandT").oninput=function(){ if(sel=="brand"){ P.el.brand.text=this.value; draw(); } };
 fontSel.onchange=function(){ setFont(this.value); };
+document.getElementById("lowp").onchange=draw;
 function setFont(name){ P.font=name; const id="gf-"+name.replace(/ /g,'-'); if(!document.getElementById(id)){ const l=document.createElement("link"); l.id=id; l.rel="stylesheet"; l.href="https://fonts.googleapis.com/css2?family="+name.replace(/ /g,"+")+"&display=swap"; document.head.appendChild(l); }
   if(document.fonts&&document.fonts.load){ document.fonts.load("40px '"+name+"'").then(function(){draw();setTimeout(draw,150);}).catch(function(){draw();}); } setTimeout(draw,700); setTimeout(draw,1500); }
-function refresh(){ let L=["font: "+P.font,"accent: "+P.accent,"text1: "+P.text1+"  text2: "+P.text2+"  text3: "+P.text3,"grad1: "+P.grad1+"  grad2: "+P.grad2,
+function refresh(){ let L=["font: "+P.font,"accent: "+P.accent,"text1: "+P.text1+"  text2: "+P.text2+"  text3: "+P.text3,"hour: "+P.hourCol+"  grad1: "+P.grad1+"  grad2: "+P.grad2,
   "arc: rad="+Math.round(P.arc.rad)+" span="+P.arc.span+" dashW="+P.arc.dashW+" dashLen="+P.arc.dashLen,""];
   for(const k in P.el){ const e=P.el[k]; let s=k.padEnd(6)+" ("+e.name+")  x="+e.x.toFixed(3)+" y="+e.y.toFixed(3);
     if(e.comp!=null) s+="  comp="+COMPS[e.comp].k; if(e.ring!=null) s+="  ring="+Math.round(e.ring)+"px";
@@ -231,7 +235,7 @@ function refresh(){ let L=["font: "+P.font,"accent: "+P.accent,"text1: "+P.text1
     if(e.gap!=null) s+="  gap="+Math.round(e.gap)+"px";
     if(e.span!=null) s+="  width="+e.span; if(e.fade!=null) s+="  fade="+(+e.fade).toFixed(2); if(e.text!=null) s+="  text=\""+e.text+"\""; L.push(s); }
   out.value=L.join("\n"); }
-function linkAllColours(){ linkVal("cAcc","cAccH",P.accent); linkVal("cT1","cT1H",P.text1); linkVal("cT2","cT2H",P.text2); linkVal("cT3","cT3H",P.text3); linkVal("cG1","cG1H",P.grad1); linkVal("cG2","cG2H",P.grad2); }
+function linkAllColours(){ linkVal("cAcc","cAccH",P.accent); linkVal("cT1","cT1H",P.text1); linkVal("cT2","cT2H",P.text2); linkVal("cT3","cT3H",P.text3); linkVal("cHc","cHcH",P.hourCol); linkVal("cG1","cG1H",P.grad1); linkVal("cG2","cG2H",P.grad2); }
 function copyOut(){ out.select(); document.execCommand("copy"); }
 function reset(){ P=defaults(); sel=null; guide=null; document.getElementById("fontSel").value=P.font; linkAllColours(); syncPanel(); setFont(P.font); }
 linkAllColours();
