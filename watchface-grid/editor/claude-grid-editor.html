@@ -89,22 +89,22 @@ const COMPS=[
  {k:"Alt Time Zone",ic:0xeb54,v:"14:23",lb:"NY"},
 ];
 const SEC_IDX=21;
-function defaults(){return {font:"Commit Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#B5502F",grad2:"#FFC08A",
-  arc:{span:75,dashW:10,dashLen:15,frac:0.5,rad:224},
+function defaults(){return {font:"Chivo Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",
+  arc:{span:74,dashW:10,dashLen:15,frac:0.5,rad:228},
   el:{
   batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:22,num:24,sym:24},
-  d02:{name:"Data 02 (upper-left)",kind:"chip",x:0.166,y:0.328,comp:7,num:30,sym:24},
-  d03:{name:"Data 03 (upper-right)",kind:"chip",x:0.834,y:0.328,comp:1,num:30,sym:24},
-  d04:{name:"Data 04 (left ring)",kind:"ring",x:0.137,y:0.516,comp:22,ring:56,num:36,sym:24,frac:0.53},
-  d05:{name:"Data 05 (right ring)",kind:"ring",x:0.863,y:0.516,comp:23,ring:56,num:36,sym:24,frac:0.72},
-  d06:{name:"Data 06 (lower-left)",kind:"chip",x:0.166,y:0.755,comp:17,num:30,sym:24},
-  d08:{name:"Data 07 (lower-right)",kind:"chip",x:0.834,y:0.755,comp:2,num:30,sym:24},
+  d02:{name:"Data 02 (upper-left)",kind:"chip",x:0.166,y:0.299,comp:7,num:30,sym:24},
+  d03:{name:"Data 03 (upper-right)",kind:"chip",x:0.834,y:0.299,comp:1,num:30,sym:24},
+  d04:{name:"Data 04 (left ring)",kind:"ring",x:0.135,y:0.500,comp:22,ring:56,num:36,sym:24,frac:0.53},
+  d05:{name:"Data 05 (right ring)",kind:"ring",x:0.865,y:0.500,comp:23,ring:56,num:36,sym:24,frac:0.72},
+  d06:{name:"Data 06 (lower-left)",kind:"chip",x:0.166,y:0.724,comp:17,num:30,sym:24},
+  d08:{name:"Data 07 (lower-right)",kind:"chip",x:0.834,y:0.724,comp:25,num:30,sym:24},
   sec:{name:"Data 08 (dial)",kind:"tick",x:0.500,y:0.832,comp:SEC_IDX,ring:50,num:30,sym:24,frac:0.63},
-  time:{name:"Time",kind:"time",x:0.500,y:0.500,gap:47,num:120,fade:0.6},
-  brand:{name:"Brand text",kind:"brand",x:0.500,y:0.207,num:32,text:"TACTIX"},
-  alarmi:{name:"Alarm indicator",kind:"ind",x:0.630,y:0.207,sym:22,ic:0xea04},
-  swatch:{name:"Stopwatch indicator",kind:"ind",x:0.710,y:0.207,sym:22,ic:0xff9b},
-  date:{name:"Date",kind:"date",x:0.500,y:0.832,num:34,gap:76},
+  time:{name:"Time",kind:"time",x:0.500,y:0.500,gap:56,num:139,fade:0.44},
+  brand:{name:"Brand text",kind:"brand",x:0.500,y:0.169,num:31,text:"TACTIX"},
+  alarmi:{name:"Alarm indicator",kind:"ind",x:0.166,y:0.169,sym:22,ic:0xea04},
+  swatch:{name:"Stopwatch indicator",kind:"ind",x:0.834,y:0.169,sym:22,ic:0xff9b},
+  date:{name:"Date",kind:"date",x:0.500,y:0.832,num:30,gap:81},
   week:{name:"Week",kind:"week",x:0.500,y:0.980,num:27,span:52},
 }};}
 let P=defaults(), sel=null, guide=null, boxes={}, lowPower=false;
@@ -125,7 +125,7 @@ function tickRing(x,y,r,frac){ const n=60,lit=Math.round(n*frac),len=9,pen=2; ct
 function battArc(){ const a=P.arc, r=a.rad, n=16, lit=Math.round(n*a.frac), st=90+a.span/2, en=90-a.span/2; ctx.lineWidth=a.dashW;
   for(let i=0;i<n;i++){ const ang=(st-(st-en)*i/(n-1))*Math.PI/180, c=Math.cos(ang), s=Math.sin(ang);
     ctx.strokeStyle=i<lit?lerp(GA,GB,i/n):TRACK; ctx.beginPath(); ctx.moveTo(cx+r*c,cy-r*s); ctx.lineTo(cx+(r-a.dashLen)*c,cy-(r-a.dashLen)*s); ctx.stroke(); }
-  boxes.arc=[cx-140,cy-r-8,cx+140,cy-r*Math.sin((90-a.span/2)*Math.PI/180)+a.dashLen+4]; }
+}
 function tabular(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; let cw=0;
   for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2;
   for(let i=0;i<str.length;i++){ ctx.fillStyle=color; ctx.fillText(str[i],sx+cw*(i+0.5),y); } }
@@ -135,7 +135,7 @@ function symbol(e,x,y){ const c=COMPS[e.comp], s=e.sym;
   if(c && c.ic!=null){ const im=img(c.ic); if(im&&im.complete) tintIcon(im,x,y,s,P.text3); return; }
   ctx.fillStyle=P.text3; ctx.font=num(Math.round(s*0.72)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(c?c.lb:"",x,y); }
 function drawEl(k){ const e=P.el[k], x=e.x*SZ, y=e.y*SZ, c=COMPS[e.comp]; ctx.textAlign="center"; ctx.textBaseline="middle";
-  if(e.kind=="time"){ const f=num(e.num); const mmy=y+e.gap, topY=mmy-e.num*0.42, botY=mmy+e.num*0.42; const g=ctx.createLinearGradient(0,topY,0,botY); const fw=Math.max(0.001,e.fade); g.addColorStop(0,P.grad1); g.addColorStop(Math.max(0,0.5-fw*0.5),P.grad1); g.addColorStop(Math.min(1,0.5+fw*0.5),P.grad2); g.addColorStop(1,P.grad2); if(lowPower){ tabularStroke("01",x,y-e.gap,f,P.hourCol); tabularStroke("33",x,mmy,f,g); } else { tabular("01",x,y-e.gap,f,P.hourCol); tabular("33",x,mmy,f,g); } boxes[k]=[x-72,y-e.gap-e.num*0.7,x+72,y+e.gap+e.num*0.7]; return; }
+  if(e.kind=="time"){ const f=num(e.num); const mmy=y+e.gap, topY=mmy-e.num*0.42, botY=mmy+e.num*0.42; const g=ctx.createLinearGradient(0,topY,0,botY); const fw=Math.max(0.001,e.fade); g.addColorStop(0,P.grad1); g.addColorStop(Math.max(0,0.5-fw*0.5),P.grad1); g.addColorStop(Math.min(1,0.5+fw*0.5),P.grad2); g.addColorStop(1,P.grad2); if(lowPower){ tabularStroke("01",x,y-e.gap,f,P.hourCol); tabularStroke("33",x,mmy,f,g); } else { tabular("01",x,y-e.gap,f,P.hourCol); tabular("33",x,mmy,f,g); } boxes[k]=[x-e.num*0.62,y-e.gap-e.num*0.42,x+e.num*0.62,y+e.gap+e.num*0.42]; return; }
   if(e.kind=="brand"){ ctx.fillStyle=P.text3; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(e.text,x,y); boxes[k]=[x-70,y-18,x+70,y+18]; return; }
   if(e.kind=="ind"){ const im=img(e.ic); if(im&&im.complete) tintIcon(im,x,y,e.sym,P.text3); boxes[k]=[x-e.sym/2-5,y-e.sym/2-5,x+e.sym/2+5,y+e.sym/2+5]; return; }
   if(e.kind=="date"){ if(lowPower){ ctx.fillStyle=P.text2; ctx.font=num(Math.round(e.num*0.85)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("19",x,y-e.num*0.42); ctx.fillText("SEP",x,y+e.num*0.42); boxes[k]=[x-40,y-e.num*0.85,x+40,y+e.num*0.85]; return; } const d=e.gap; ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.fillText("SEP",x-d,y); ctx.fillText("19",x+d,y); boxes[k]=[x-d-42,y-24,x+d+42,y+24]; return; }
@@ -162,13 +162,17 @@ function drawEl(k){ const e=P.el[k], x=e.x*SZ, y=e.y*SZ, c=COMPS[e.comp]; ctx.te
 }
 function draw(){ lowPower=document.getElementById("lowp").checked; ctx.fillStyle="#000"; ctx.fillRect(0,0,SZ,SZ); boxes={}; GA=hexRgb(P.grad1); GB=hexRgb(P.grad2); battArc();
   ["batt","d02","d03","d04","d05","d06","d08","sec","time","date","week","brand","alarmi","swatch"].forEach(drawEl);
-  if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#E95625"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
+  if(sel=="arc"){ const a=P.arc, hs=a.span/2*Math.PI/180; ctx.strokeStyle="#E95625"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.arc(cx,cy,a.rad+5,-Math.PI/2-hs,-Math.PI/2+hs); ctx.stroke(); ctx.beginPath(); ctx.arc(cx,cy,a.rad-a.dashLen-5,-Math.PI/2-hs,-Math.PI/2+hs); ctx.stroke(); ctx.setLineDash([]); }
+  else if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#E95625"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
     if(guide.x!=null){ ctx.beginPath(); ctx.moveTo(guide.x,0); ctx.lineTo(guide.x,SZ); ctx.stroke(); }
     if(guide.y!=null){ ctx.beginPath(); ctx.moveTo(0,guide.y); ctx.lineTo(SZ,guide.y); ctx.stroke(); } ctx.setLineDash([]); }
   refresh();
 }
-function hit(mx,my){ let best=null,bd=1e9; for(const k in boxes){ const b=boxes[k], ix=Math.max(b[0],Math.min(mx,b[2])), iy=Math.max(b[1],Math.min(my,b[3])); const d=(mx-ix)**2+(my-iy)**2; if(d<bd){bd=d;best=k;} } return bd<42*42?best:null; }
+function hit(mx,my){ let best=null,bd=1e9;
+  { const a=P.arc, dx=mx-cx, dy=my-cy, dist=Math.hypot(dx,dy), ang=Math.atan2(dx,-dy)*180/Math.PI, band=Math.max(16,a.dashLen+8);
+    if(Math.abs(dist-(a.rad-a.dashLen/2))<band && Math.abs(ang)<=a.span/2+5){ best="arc"; bd=0; } }
+  for(const k in boxes){ if(k=="arc")continue; const b=boxes[k], ix=Math.max(b[0],Math.min(mx,b[2])), iy=Math.max(b[1],Math.min(my,b[3])); const d=(mx-ix)**2+(my-iy)**2; if(d<bd){bd=d;best=k;} } return bd<42*42?best:null; }
 function snapAxis(val,others){ let best=val,g=null,bd=0.014; const t=[0.5].concat(others); for(const o of t){ if(Math.abs(val-o)<bd){ bd=Math.abs(val-o); best=o; g=o*SZ; } } return [best,g]; }
 let drag=null; const cv=document.getElementById("c");
 cv.addEventListener("pointerdown",ev=>{ const r=cv.getBoundingClientRect(), mx=(ev.clientX-r.left)*SZ/r.width, my=(ev.clientY-r.top)*SZ/r.height; const k=hit(mx,my);
