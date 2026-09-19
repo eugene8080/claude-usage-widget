@@ -93,9 +93,9 @@ function defaults(){return {
   font:"Share Tech Mono", showSeconds:false,
   bg:"#000000", accent:"#D97757", val:"#FFFFFF", dim:"#AAAAAA", track:"#333333", cap:"#FF5F5F",
   el:{
-    prompt:{name:"Prompt line", kind:"text", x:0.305, y:0.177, size:26, text:"claude ~ %"},
-    time:  {name:"Time",        kind:"time", x:0.402, y:0.250, size:90},
-    date:  {name:"Date",        kind:"date", x:0.305, y:0.454, size:26},
+    prompt:{name:"Prompt line", kind:"text", x:0.500, y:0.177, size:26, text:"claude ~ %"},
+    time:  {name:"Time",        kind:"time", x:0.500, y:0.250, size:90},
+    date:  {name:"Date",        kind:"date", x:0.500, y:0.454, size:26},
     rows:  {name:"Meter rows",  kind:"rows", y:0.556, gap:0.113, size:25,
             labelX:0.148, barX:0.242, barW:0.287, barH:0.030, pctX:0.639, resetX:0.858},
     cursor:{name:"Cursor",      kind:"cursor", x:0.526, y:0.469, w:0.030, h:0.028},
