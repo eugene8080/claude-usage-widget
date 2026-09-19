@@ -2,13 +2,15 @@
     <!-- Chivo Mono (Medium/500), generated from the variable TTF into CIQ bitmap fonts by
          tools/build_fonts_chivo.py. Each carries only the glyphs its fields draw, so the big
          sizes stay small: CGTime/CGTimeOutline are digits only. Sizes come straight from the
-         layout editor's final numbers. -->
-    <font id="CGTime"        filename="cg_time.fnt" />
-    <font id="CGTimeOutline" filename="cg_time_o.fnt" />
-    <font id="CGBig"         filename="cg_big.fnt" />
-    <font id="CGMed"         filename="cg_med.fnt" />
-    <font id="CGWeek"        filename="cg_week.fnt" />
-    <font id="CGSmall"       filename="cg_small.fnt" />
+         layout editor's final numbers.
+         antialias="true" is REQUIRED - without it CIQ thresholds the atlas alpha to 1-bit and the
+         text renders jagged; with it the smooth glyph edges are preserved on-device. -->
+    <font id="CGTime"        antialias="true" filename="cg_time.fnt" />
+    <font id="CGTimeOutline" antialias="true" filename="cg_time_o.fnt" />
+    <font id="CGBig"         antialias="true" filename="cg_big.fnt" />
+    <font id="CGMed"         antialias="true" filename="cg_med.fnt" />
+    <font id="CGWeek"        antialias="true" filename="cg_week.fnt" />
+    <font id="CGSmall"       antialias="true" filename="cg_small.fnt" />
     <!-- Per-field icons from Tabler Icons (MIT), one glyph per complication type. -->
-    <font id="TablerIcon"    filename="cg_icon.fnt" />
+    <font id="TablerIcon"    antialias="true" filename="cg_icon.fnt" />
 </fonts>
