@@ -27,9 +27,9 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private const NEAR_CAP = 0xFF5F5F;    // bar fill at 80%+
 
     // --- layout (fractions of the screen), from the editor ---
-    private const PROMPT_X = 0.305;  private const PROMPT_Y = 0.177;
-    private const TIME_X = 0.402;    private const TIME_Y = 0.250;
-    private const DATE_X = 0.305;    private const DATE_Y = 0.454;
+    private const PROMPT_X = 0.500;  private const PROMPT_Y = 0.177;
+    private const TIME_X = 0.500;    private const TIME_Y = 0.250;
+    private const DATE_X = 0.500;    private const DATE_Y = 0.454;
     private const ROWS_Y = 0.556;    private const ROWS_GAP = 0.113;
     private const LABEL_X = 0.148;   private const BAR_X = 0.242;   private const BAR_W = 0.287;
     private const BAR_H = 0.030;     private const BAR_DY = 0.018;
