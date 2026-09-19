@@ -1,7 +1,9 @@
 <fonts>
     <!-- Share Tech Mono, generated from the TTF into CIQ bitmap fonts by tools/build_fonts_stm.py.
          The text font carries the full printable-ASCII set (prompt, date, labels, %, reset times);
-         the time font is digits + colon only, at 90px, to stay small. -->
-    <font id="STMono" filename="stm_text.fnt" />
-    <font id="STMonoTime" filename="stm_time.fnt" />
+         the time font is digits + colon only, at 90px, to stay small.
+         antialias="true" is REQUIRED - without it CIQ thresholds the atlas alpha to 1-bit and the
+         text renders jagged; with it the smooth glyph edges are preserved on-device. -->
+    <font id="STMono"     antialias="true" filename="stm_text.fnt" />
+    <font id="STMonoTime" antialias="true" filename="stm_time.fnt" />
 </fonts>
