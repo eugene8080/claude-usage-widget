@@ -15,8 +15,8 @@ app/build/
 *.jks
 
 # Connect IQ build output
-watch/build/
-watch/dist/
+watch-usage-app/build/
+watch-usage-app/dist/
 
 # Connect IQ watch face build output
 watchface-terminal/build/

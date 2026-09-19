@@ -2,7 +2,7 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude Terminal - editor</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link id="gf-JetBrains-Mono" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono&display=swap" rel="stylesheet">
+<link id="gf-Share-Tech-Mono" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
   body{margin:0;background:#141414;color:#ddd;font-family:ui-sans-serif,Segoe UI,Roboto,sans-serif;display:flex;gap:22px;padding:18px;flex-wrap:wrap;}
   h1{font-size:15px;color:#E8A487;margin:0 0 4px;} p.hint{color:#8a8a8a;font-size:12px;margin:0 0 10px;max-width:470px;line-height:1.5;}
@@ -68,18 +68,18 @@ const FONTS=["JetBrains Mono","Roboto Mono","Space Mono","Fira Code","Fira Mono"
 const SZ=454, cx=SZ/2;
 const ctx=document.getElementById("c").getContext("2d"), out=document.getElementById("out");
 // sample meter rows (5-hour, weekly, model), matching the face's three CLI rows
-const ROWS=[{lb:"5H",pct:42,rs:"5:30p"},{lb:"1W",pct:63,rs:"Wed"},{lb:"OP",pct:55,rs:"Sep 20"}];
+const ROWS=[{lb:"5H",pct:42,rs:"5:30p"},{lb:"1W",pct:63,rs:"Wed"},{lb:"FA",pct:55,rs:"Sep 20"}];
 
 function defaults(){return {
-  font:"JetBrains Mono", showSeconds:false,
+  font:"Share Tech Mono", showSeconds:false,
   bg:"#000000", accent:"#D97757", val:"#FFFFFF", dim:"#AAAAAA", track:"#333333", cap:"#FF5F5F",
   el:{
-    prompt:{name:"Prompt line", kind:"text", x:0.500, y:0.100, size:26, text:"claude ~ %"},
-    time:  {name:"Time",        kind:"time", x:0.500, y:0.170, size:58},
-    date:  {name:"Date",        kind:"date", x:0.500, y:0.400, size:26},
-    rows:  {name:"Meter rows",  kind:"rows", y:0.540, gap:0.105, size:26,
-            labelX:0.150, barX:0.320, barW:0.160, barH:0.035, pctX:0.650, resetX:0.860},
-    cursor:{name:"Cursor",      kind:"cursor", x:0.500, y:0.870, w:0.030, h:0.028},
+    prompt:{name:"Prompt line", kind:"text", x:0.305, y:0.177, size:26, text:"claude ~ %"},
+    time:  {name:"Time",        kind:"time", x:0.402, y:0.250, size:90},
+    date:  {name:"Date",        kind:"date", x:0.305, y:0.454, size:26},
+    rows:  {name:"Meter rows",  kind:"rows", y:0.556, gap:0.113, size:25,
+            labelX:0.148, barX:0.242, barW:0.287, barH:0.030, pctX:0.639, resetX:0.858},
+    cursor:{name:"Cursor",      kind:"cursor", x:0.526, y:0.469, w:0.030, h:0.028},
   }};}
 
 let P=defaults(), sel=null, guide=null, boxes={};
