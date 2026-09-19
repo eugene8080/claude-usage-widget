@@ -19,8 +19,8 @@ watch/build/
 watch/dist/
 
 # Connect IQ watch face build output
-watchface/build/
-watchface/dist/
+watchface-terminal/build/
+watchface-terminal/dist/
 
 watchface-grid/build/
 watchface-grid/dist/
