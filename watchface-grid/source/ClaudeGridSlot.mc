@@ -126,19 +126,23 @@ class ClaudeGridSlot extends WatchUi.Drawable {
             dc.drawText(cx, cy + _RING_VALUE_DY, pickFont(dc, value), value,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else if (horizontal) {
-            // Battery-style: icon and value on one row, the pair centred on cx.
+            // Battery-style: an icon - or the text LABEL when the complication has no icon (the
+            // Claude usage meters are icon-less, so this is what shows "FABLE" beside "55%") -
+            // beside the value on one row, the pair centred on cx.
             var vf = pickFont(dc, value);
             var vw = dc.getTextWidthInPixels(value, vf);
-            var iw = hasIcon ? dc.getTextWidthInPixels(iconChar, _fIcon) : 0;
-            var gap = (iw > 0) ? 7 : 0;
-            var sx = cx - (iw + gap + vw) / 2;
-            if (iw > 0) {
+            var mFont = hasIcon ? _fIcon : _fLabel;
+            var marker = hasIcon ? iconChar : label;
+            var mw = marker.equals("") ? 0 : dc.getTextWidthInPixels(marker, mFont);
+            var gap = (mw > 0) ? 7 : 0;
+            var sx = cx - (mw + gap + vw) / 2;
+            if (mw > 0) {
                 dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
-                dc.drawText(sx, cy, _fIcon, iconChar,
+                dc.drawText(sx, cy, mFont, marker,
                     Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             }
             dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(sx + iw + gap, cy, vf, value,
+            dc.drawText(sx + mw + gap, cy, vf, value,
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         } else if (stacked) {
             // hi/low temperature: two numbers with a thin divider, no icon/label (editor look).
