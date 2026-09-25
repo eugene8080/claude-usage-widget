@@ -41,8 +41,9 @@
       <div class="row"><label>Second</label><input type="range" id="pvS" min="0" max="59" step="1"><span class="val" id="pvSV"></span></div>
       <div class="row"><label>Day</label><input type="range" id="pvD" min="1" max="31" step="1"><span class="val" id="pvDV"></span></div>
       <div class="row"><label>Month</label><input type="range" id="pvMo" min="1" max="12" step="1"><span class="val" id="pvMoV"></span></div>
+      <div class="row"><label title="battery bar fill; 20% or less uses the Cap colour">Battery %</label><input type="range" id="pvB" min="0" max="100" step="1"><span class="val" id="pvBV"></span></div>
       <div class="row chk"><input type="checkbox" id="pv24" checked><label style="flex:0 0 auto">24-hour</label><button class="sec" id="pvNow" style="margin:0 0 0 auto">Now</button></div>
-      <div class="muted">Drives the time and the date line. Preview only - not part of the settings block.</div>
+      <div class="muted">Drives the time, the date line and the battery bar. Preview only - not part of the settings block.</div>
     </div>
     <div class="panel">
       <h2>Selected: <span id="selName">- none -</span></h2>
@@ -57,6 +58,10 @@
       <div id="ctlResetX" class="row" style="display:none"><label>Reset x</label><input type="range" id="rxR" min="0.55" max="0.98" step="0.001"><span class="val" id="rxRV"></span></div>
       <div id="ctlCurW" class="row" style="display:none"><label>Cursor w</label><input type="range" id="cwR" min="0.01" max="0.12" step="0.001"><span class="val" id="cwRV"></span></div>
       <div id="ctlCurH" class="row" style="display:none"><label>Cursor h</label><input type="range" id="chR" min="0.01" max="0.09" step="0.001"><span class="val" id="chRV"></span></div>
+      <div id="ctlBSegs" class="row" style="display:none"><label>Segments</label><input type="range" id="bsR" min="4" max="30" step="1"><span class="val" id="bsRV"></span></div>
+      <div id="ctlBSegW" class="row" style="display:none"><label>Segment w</label><input type="range" id="bswR" min="0.004" max="0.050" step="0.001"><span class="val" id="bswRV"></span></div>
+      <div id="ctlBGap" class="row" style="display:none"><label>Segment gap</label><input type="range" id="bgR" min="0.000" max="0.030" step="0.001"><span class="val" id="bgRV"></span></div>
+      <div id="ctlBH" class="row" style="display:none"><label>Bar height</label><input type="range" id="bbhR" min="0.004" max="0.080" step="0.001"><span class="val" id="bbhRV"></span></div>
       <div id="ctlNone" class="muted">Click a line on the watch to edit it.</div>
     </div>
     <div class="panel">
@@ -111,6 +116,10 @@ function defaults(){return {
     rows:  {name:"Meter rows",  kind:"rows", y:0.532, gap:0.113, size:25,
             labelX:0.148, barX:0.242, barW:0.287, barH:0.030, pctX:0.639, resetX:0.858},
     cursor:{name:"Cursor",      kind:"cursor", x:0.526, y:2.000, w:0.030, h:0.028},
+    // Straight counterpart of Claude Grid's top battery arc, at the same scale: 16 segments,
+    // 10 x 15 px on the 454 px screen, 5 px apart (235 px long). Centred on x, top-aligned at y;
+    // starts just below the meter rows.
+    batt:  {name:"Battery bar", kind:"batt", x:0.500, y:0.845, segs:16, segW:0.022, gap:0.011, h:0.033},
   }};}
 
 let P=defaults(), sel=null, guide=null, boxes={};
@@ -118,7 +127,7 @@ let P=defaults(), sel=null, guide=null, boxes={};
 // Preview clock (sliders). Formats follow the face: hour "%02d" (12 h -> 01-12), date "Fri Sep 25".
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 let PV;
-function pvNow(){ const n=new Date(); PV={h:n.getHours(),m:n.getMinutes(),s:n.getSeconds(),day:n.getDate(),mon:n.getMonth()+1,year:n.getFullYear(),h24:PV?PV.h24:true}; }
+function pvNow(){ const n=new Date(); PV={h:n.getHours(),m:n.getMinutes(),s:n.getSeconds(),day:n.getDate(),mon:n.getMonth()+1,year:n.getFullYear(),h24:PV?PV.h24:true,batt:PV?PV.batt:70}; }
 pvNow();
 function pad2(v){ return (v<10?"0":"")+v; }
 function daysIn(){ return new Date(PV.year,PV.mon,0).getDate(); }
@@ -167,10 +176,16 @@ function drawEl(k){ const e=P.el[k];
   if(e.kind=="cursor"){ const x=e.x*SZ, y=e.y*SZ, w=e.w*SZ, h=e.h*SZ; ctx.fillStyle=P.accent;
     const x0=Math.round(x-w/2), y0=Math.round(y); ctx.fillRect(x0,y0,Math.round(x-w/2+w)-x0,Math.round(y+h)-y0);
     boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+h+4]; return; }
+  if(e.kind=="batt"){ // exactly the face's drawBattery(): whole-pixel segments, centred on x
+    const n=e.segs, sw=Math.max(1,Math.round(e.segW*SZ)), gp=Math.round(e.gap*SZ), bh=Math.max(1,Math.round(e.h*SZ));
+    const total=n*sw+(n-1)*gp, x0=Math.round(e.x*SZ)-Math.floor(total/2), y0=Math.round(e.y*SZ);
+    const lit=Math.min(n,Math.ceil(n*PV.batt/100)), low=PV.batt<=20;
+    for(let i=0;i<n;i++){ ctx.fillStyle=(i<lit)?(low?P.cap:P.accent):P.track; ctx.fillRect(x0+i*(sw+gp),y0,sw,bh); }
+    boxes[k]=[x0-4,y0-4,x0+total+4,y0+bh+4]; return; }
 }
 
 function draw(){ P.vfd=document.getElementById("vfd").checked; ctx.fillStyle=P.bg; ctx.fillRect(0,0,SZ,SZ); boxes={};
-  ["prompt","time","date","rows","cursor"].forEach(drawEl);
+  ["prompt","time","date","rows","batt","cursor"].forEach(drawEl);
   if(P.vfd) meshOverlay();
   if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#D97757"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
@@ -231,7 +246,8 @@ function setR(rid,vid,val,dp){ document.getElementById(rid).value=val; document.
 function syncPanel(){ const e=sel?P.el[sel]:null;
   document.getElementById("selName").textContent=e?e.name:"- none -";
   document.getElementById("ctlNone").style.display=e?"none":"block";
-  const isRows=e&&e.kind=="rows", isCur=e&&e.kind=="cursor";
+  const isRows=e&&e.kind=="rows", isCur=e&&e.kind=="cursor", isBatt=e&&e.kind=="batt";
+  show("ctlBSegs",isBatt); show("ctlBSegW",isBatt); show("ctlBGap",isBatt); show("ctlBH",isBatt);
   show("ctlText",e&&e.kind=="text");
   show("ctlSize",e&&(e.kind=="text"||e.kind=="time"||e.kind=="date"||isRows));
   show("ctlGap",isRows); show("ctlLabelX",isRows); show("ctlBarX",isRows); show("ctlBarW",isRows);
@@ -243,6 +259,7 @@ function syncPanel(){ const e=sel?P.el[sel]:null;
   if(e.kind=="text") document.getElementById("txt").value=e.text;
   if(isRows){ setR("gapR","gapRV",e.gap,3); setR("lxR","lxRV",e.labelX,3); setR("bxR","bxRV",e.barX,3); setR("bwR","bwRV",e.barW,3); setR("bhR","bhRV",e.barH,3); setR("pxR","pxRV",e.pctX,3); setR("rxR","rxRV",e.resetX,3); }
   if(isCur){ setR("cwR","cwRV",e.w,3); setR("chR","chRV",e.h,3); }
+  if(isBatt){ setR("bsR","bsRV",e.segs,0); setR("bswR","bswRV",e.segW,3); setR("bgR","bgRV",e.gap,3); setR("bbhR","bbhRV",e.h,3); }
 }
 function bindR(rid,vid,dp,fn){ document.getElementById(rid).oninput=function(){ fn(+this.value); document.getElementById(vid).textContent=dp?(+this.value).toFixed(dp):(""+Math.round(+this.value)); draw(); }; }
 bindR("sizeR","sizeRV",0,v=>{ if(sel)P.el[sel].size=v; });
@@ -255,6 +272,10 @@ bindR("pxR","pxRV",3,v=>{ if(sel)P.el[sel].pctX=v; });
 bindR("rxR","rxRV",3,v=>{ if(sel)P.el[sel].resetX=v; });
 bindR("cwR","cwRV",3,v=>{ if(sel)P.el[sel].w=v; });
 bindR("chR","chRV",3,v=>{ if(sel)P.el[sel].h=v; });
+bindR("bsR","bsRV",0,v=>{ if(sel)P.el[sel].segs=v; });
+bindR("bswR","bswRV",3,v=>{ if(sel)P.el[sel].segW=v; });
+bindR("bgR","bgRV",3,v=>{ if(sel)P.el[sel].gap=v; });
+bindR("bbhR","bbhRV",3,v=>{ if(sel)P.el[sel].h=v; });
 document.getElementById("txt").oninput=function(){ if(sel&&P.el[sel].kind=="text"){ P.el[sel].text=this.value; draw(); } };
 document.getElementById("secs").onchange=function(){ P.showSeconds=this.checked; draw(); };
 document.getElementById("vfd").onchange=draw;
@@ -265,8 +286,9 @@ function syncPV(){ document.getElementById("pvD").max=daysIn(); if(PV.day>daysIn
   setR("pvM","pvMV",PV.m,0); document.getElementById("pvMV").textContent=pad2(PV.m);
   setR("pvS","pvSV",PV.s,0); document.getElementById("pvSV").textContent=pad2(PV.s);
   setR("pvD","pvDV",PV.day,0); setR("pvMo","pvMoV",PV.mon,0); document.getElementById("pvMoV").textContent=MONTHS[PV.mon-1].toUpperCase();
+  setR("pvB","pvBV",PV.batt,0); document.getElementById("pvBV").textContent=PV.batt+"%";
   document.getElementById("pv24").checked=PV.h24; }
-[["pvH","h"],["pvM","m"],["pvS","s"],["pvD","day"],["pvMo","mon"]].forEach(([id,key])=>{ document.getElementById(id).oninput=function(){ PV[key]=+this.value; syncPV(); draw(); }; });
+[["pvH","h"],["pvM","m"],["pvS","s"],["pvD","day"],["pvMo","mon"],["pvB","batt"]].forEach(([id,key])=>{ document.getElementById(id).oninput=function(){ PV[key]=+this.value; syncPV(); draw(); }; });
 document.getElementById("pv24").onchange=function(){ PV.h24=this.checked; syncPV(); draw(); };
 document.getElementById("pvNow").onclick=function(){ pvNow(); syncPV(); draw(); };
 
@@ -294,6 +316,8 @@ function refresh(){ const e=P.el; let L=[
     +"  labelX="+e.rows.labelX.toFixed(3)+" barX="+e.rows.barX.toFixed(3)+" barW="+e.rows.barW.toFixed(3)
     +" barH="+e.rows.barH.toFixed(3)+" pctX="+e.rows.pctX.toFixed(3)+" resetX="+e.rows.resetX.toFixed(3),
   "cursor  x="+e.cursor.x.toFixed(3)+" y="+e.cursor.y.toFixed(3)+"  w="+e.cursor.w.toFixed(3)+" h="+e.cursor.h.toFixed(3),
+  "battery x="+e.batt.x.toFixed(3)+" y="+e.batt.y.toFixed(3)+"  segs="+e.batt.segs+" segW="+e.batt.segW.toFixed(3)
+    +" gap="+e.batt.gap.toFixed(3)+" h="+e.batt.h.toFixed(3),
 ]; out.value=L.join("\n"); }
 function copyOut(){ out.select(); document.execCommand("copy"); }
 function reset(){ P=defaults(); sel=null; guide=null; themeSel.value=P.theme; document.getElementById("vfd").checked=P.vfd;

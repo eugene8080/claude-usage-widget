@@ -86,7 +86,7 @@ Three Connect IQ projects put the same usage numbers on a fēnix 8 / tactix 8 cl
 | --- | --- |
 | [`watch-usage-app/`](watch-usage-app/README.md) | **Claude Usage** — a glance showing the `5H` / `1W` / per-model meters with their reset times, and the **publisher**: it receives the numbers from the phone and republishes them as three watch **complications** that faces can show. |
 | [`watchface-grid/`](watchface-grid/editor/README.md) | **Claude Grid** — an Iron Grit–style data face: a big stacked time, battery arc, seconds dial and **seven editable data fields** that take *any* complication. |
-| [`watchface-terminal/`](watchface-terminal/README.md) | **Claude Terminal** — a CLI-styled face: a prompt line, the time, the date and the three Claude meters as terminal rows with bars, percentages and reset times. |
+| [`watchface-terminal/`](watchface-terminal/README.md) | **Claude Terminal** — a CLI-styled face: a prompt line, the time, the date, the three Claude meters as terminal rows with bars, percentages and reset times, and a battery bar. |
 
 **How the numbers get there.** The watch never talks to Claude (Cloudflare and credential safety
 both rule it out — see the watch-app README). The phone app pushes the percentages over Bluetooth
@@ -112,6 +112,8 @@ is why the watch app must be installed (and opened once) for the faces to show C
 - The three Claude meters as CLI rows (`5H`, `1W`, model) with bars, percentages and absolute
   reset times, under an `eugene@tactix ~ $` prompt and the time, in IBM Plex Mono on the Night Owl
   palette.
+- A segmented **battery bar** under the meters — Claude Grid's top battery arc, straightened (turns
+  red at 20%).
 - Settings (Garmin Connect): **Show seconds** (on by default), and the **prompt text** — make the
   top line say whatever you like.
 - VFD style by default (glowing time + full-face mesh).
