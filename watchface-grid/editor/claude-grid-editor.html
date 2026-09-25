@@ -406,7 +406,10 @@ function bindColor(pid,hid,set){ const p=document.getElementById(pid), h=documen
 bindColor("cAcc","cAccH",v=>P.accent=v); bindColor("cT1","cT1H",v=>P.text1=v); bindColor("cT2","cT2H",v=>P.text2=v);
 bindColor("cT3","cT3H",v=>P.text3=v); bindColor("cHc","cHcH",v=>P.hourCol=v);
 bindColor("cG1","cG1H",v=>P.grad1=v); bindColor("cG2","cG2H",v=>P.grad2=v);
-bindColor("cHg","cHgH",v=>P.hourGlow=v); bindColor("cMg","cMgH",v=>P.minGlow=v);
+// A glow colour only shows in VFD style, so editing one switches the VFD preview on rather
+// than appearing to do nothing.
+function glowEdit(set){ return v=>{ set(v); document.getElementById("vfd").checked=true; }; }
+bindColor("cHg","cHgH",glowEdit(v=>P.hourGlow=v)); bindColor("cMg","cMgH",glowEdit(v=>P.minGlow=v));
 document.getElementById("brandT").oninput=function(){ if(sel=="brand"){ P.el.brand.text=this.value; draw(); } };
 fontSel.onchange=function(){ setFont(this.value); };
 document.getElementById("lowp").onchange=draw;
@@ -445,5 +448,9 @@ function linkAllColours(){ linkVal("cHg","cHgH",P.hourGlow); linkVal("cMg","cMgH
 function copyOut(){ out.select(); document.execCommand("copy"); }
 function reset(){ P=defaults(); sel=null; guide=null; themeSel.value=P.theme; document.getElementById("vfd").checked=P.vfd; document.getElementById("fontSel").value=P.font; linkAllColours(); syncPanel(); setFont(P.font); }
 linkAllColours();
+// Start in the face's own style. Only reset() used to copy P.vfd into the checkbox, so the page
+// opened with VFD unticked - draw() reads the checkbox, turned P.vfd off, and the Hour / Minute
+// glow pickers silently did nothing (the glow is only drawn in VFD style).
+document.getElementById("vfd").checked=P.vfd;
 document.getElementById("fontSel").value=P.font; syncPanel(); setFont(P.font); setTimeout(prefetchFonts,1500);
 </script></body></html>
