@@ -33,10 +33,10 @@ class ClaudeFaceView extends WatchUi.WatchFace {
 
     // --- layout (fractions of the screen), from the editor ---
     // Prompt, time and date are centred on their x; every line is top-aligned at its y.
-    private const PROMPT_X = 0.436;  private const PROMPT_Y = 0.188;
-    private const TIME_X = 0.500;    private const TIME_Y = 0.247;
-    private const DATE_X = 0.313;    private const DATE_Y = 0.445;
-    private const ROWS_Y = 0.532;    private const ROWS_GAP = 0.113;
+    private const PROMPT_X = 0.434;  private const PROMPT_Y = 0.187;
+    private const TIME_X = 0.500;    private const TIME_Y = 0.234;
+    private const DATE_X = 0.313;    private const DATE_Y = 0.423;
+    private const ROWS_Y = 0.508;    private const ROWS_GAP = 0.113;
     private const LABEL_X = 0.148;   private const BAR_X = 0.242;   private const BAR_W = 0.287;
     private const BAR_H = 0.030;     private const BAR_DY = 0.018;
     private const PCT_X = 0.639;     private const RESET_X = 0.858;
