@@ -65,6 +65,10 @@ Then continue with first-run setup below.
 
 Three Connect IQ projects put the same usage numbers on a fēnix 8 / tactix 8 class watch:
 
+<p align="center">
+<img src="docs/watchfaces.png" alt="The Claude Grid and Claude Terminal watch faces on a tactix 8" width="720" />
+</p>
+
 | Project | What it is |
 | --- | --- |
 | [`watch-usage-app/`](watch-usage-app/README.md) | **Claude Usage** — a glance showing the `5H` / `1W` / per-model meters with their reset times, and the **publisher**: it receives the numbers from the phone and republishes them as three watch **complications** that faces can show. |
@@ -133,13 +137,13 @@ Anthropic provides no public API for subscription (Pro/Max) usage. This widget r
 - **Every rolling window at a glance.** The 5-hour and 1-week usage percentages plus the separate per-model weekly cap — `1W Fable` today — each with a live countdown to its reset. The model name comes from the endpoint, and the row hides itself on accounts that aren't metered one.
 - **Refreshes itself.** A background job updates every ~15 minutes; tap the widget to force an immediate refresh.
 - **Sign in once.** A single `claude.ai` login; you only re-authenticate when the long-lived session finally expires (weeks).
-- **Resizes freely.** Snaps between a compact and a full layout, and adapts to light & dark themes.
+- **Resizes freely.** The full stacked layout fits even a one-row (3×1) widget; narrower or shorter sizes get compact layouts. Adapts to light & dark themes.
 
 ## 🛠 How it works
 
 You log in once through a real `claude.ai` WebView. The app harvests the `sessionKey` and `cf_clearance` cookies plus the WebView User-Agent, stores them encrypted on-device, and fetches usage headlessly with `OkHttp`. The endpoint serves two payload shapes — a modern top-level `limits[]` array of `{kind, percent, resets_at, scope}` entries, and the older fixed `five_hour` / `seven_day` / `seven_day_<model>` keys — and the parser reads whichever one it gets. When a headless fetch hits Cloudflare's challenge, the app silently re-solves it in an off-screen WebView (no interaction needed while `sessionKey` is valid) and retries. A `WorkManager` job refreshes every ~15 minutes. You only sign in again when the long-lived `sessionKey` itself expires, at which point the widget shows a *“Tap to sign in”* state.
 
-The widget picks a layout from the size you resize it to. A **Full** layout stacks the meters, each with its label, percentage and *“resets in”*; a **Short** layout — one home-screen row tall, two columns or wider — sets the three meters side by side instead, since one row has no space to stack them; and a **Compact** layout stacks mini bars for a narrow widget. The Claude mark and title appear once there's height to fit them, and *“resets in”* shortens to a bare countdown when narrow. All three adapt to light and dark themes, and a small amber dot appears when the numbers are stale.
+The widget picks a layout from the size you resize it to. A **Full** layout stacks the meters, each with its label, bar, percentage and *“resets in”* — down to a single home-screen row, where it tightens its type and spacing to fit the title and all three meters (the layout reads the widget's exact size rather than snapping to preset buckets); a **Short** layout sets the three meters side by side for a widget squeezed below a normal row; and a **Compact** layout stacks mini bars for a narrow widget. The Claude mark and title appear once there's height to fit them, and *“resets in”* shortens to a bare countdown when narrow. All three adapt to light and dark themes, and a small amber dot appears when the numbers are stale.
 
 ## 🔒 Security notes
 

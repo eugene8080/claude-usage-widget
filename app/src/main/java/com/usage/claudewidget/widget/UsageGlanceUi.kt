@@ -55,12 +55,18 @@ data class WidgetState(
 
 private val COMPACT_MAX_WIDTH = 130.dp
 /**
- * One home-screen row leaves no room to stack three meters, so a wide-but-short
- * widget sets them side by side instead of clipping the last one off the bottom.
+ * Below this height even the dense stacked layout can't fit three meters, so the widget sets
+ * them side by side instead of clipping the last one off the bottom. (One home-screen row is a
+ * little under 110 dp on a Pixel - tall enough for the dense stacked layout below.)
  */
-private val SHORT_MAX_HEIGHT = 80.dp
-/** Heights below which three meters leave no room for the Claude mark above them. */
-private val FULL_MARK_MIN_HEIGHT = 130.dp
+private val SHORT_MAX_HEIGHT = 70.dp
+/** Below this height the stacked layout switches to its dense sizing (one-row widgets). */
+private val DENSE_MAX_HEIGHT = 130.dp
+/**
+ * The stacked layout with its "Claude usage" header needs about this much height at its densest
+ * (measured on the emulator: 77 dp of content + 12 dp padding). It keeps the header down to here.
+ */
+private val DENSE_MARK_MIN_HEIGHT = 89.dp
 private val COMPACT_MARK_MIN_HEIGHT = 100.dp
 /** Below this width the "resets" prefix is dropped and only the reset time is shown. */
 private val RESET_PREFIX_MIN_WIDTH = 220.dp
@@ -74,6 +80,7 @@ fun UsageWidgetContent(state: WidgetState) {
     val size = LocalSize.current
     val compact = size.width < COMPACT_MAX_WIDTH
     val short = !compact && size.height < SHORT_MAX_HEIGHT
+    val dense = size.height < DENSE_MAX_HEIGHT
     val context = LocalContext.current
 
     val tap = if (state.needsLogin) {
@@ -87,7 +94,7 @@ fun UsageWidgetContent(state: WidgetState) {
             .fillMaxSize()
             .background(GlanceTheme.colors.widgetBackground)
             .cornerRadius(20.dp)
-            .padding(if (short) 6.dp else if (compact) 8.dp else 10.dp)
+            .padding(if (short || dense) 6.dp else if (compact) 8.dp else 10.dp)
             .clickable(tap),
     ) {
         when {
@@ -97,30 +104,71 @@ fun UsageWidgetContent(state: WidgetState) {
             compact -> CompactLayout(state, showMark = size.height >= COMPACT_MARK_MIN_HEIGHT)
             else -> FullLayout(
                 state,
-                showMark = size.height >= FULL_MARK_MIN_HEIGHT,
+                showMark = !dense || size.height >= DENSE_MARK_MIN_HEIGHT,
                 showResetPrefix = size.width >= RESET_PREFIX_MIN_WIDTH,
+                d = stackDims(size.height),
             )
         }
         if (state.hasData && state.stale) StaleDot()
     }
 }
 
+/**
+ * Sizes for the stacked layout. REGULAR is the original roomy look (two rows and up); DENSE is
+ * the same header + three meter rows with bars, tightened to fit a single home-screen row.
+ * [stackDims] interpolates between them by the widget's real height, so a one-row widget fills
+ * its row (a Pixel row is ~104 dp) instead of leaving a gap or clipping.
+ */
+private data class StackDims(
+    val markDp: Float, val titleSp: Float, val versionSp: Float, val headerGap: Float,
+    val labelSp: Float, val labelW: Float, val pctSp: Float, val resetSp: Float,
+    val barGap: Float, val barDp: Float, val rowGap: Float,
+)
+
+private fun stackDims(height: androidx.compose.ui.unit.Dp): StackDims {
+    // t = 0 at the densest height the header layout needs, 1 at the regular layout's height;
+    // the dense layout grows roughly one-for-one with height between them, so it stays full.
+    // (+6 dp keeps a little air under the last bar instead of packing the row edge to edge.)
+    val t = ((height.value - DENSE_MARK_MIN_HEIGHT.value - 6f) /
+        (DENSE_MAX_HEIGHT.value - DENSE_MARK_MIN_HEIGHT.value - 6f)).coerceIn(0f, 1f)
+    fun mix(a: Float, b: Float) = a + (b - a) * t
+    val a = DENSE
+    val b = REGULAR
+    return StackDims(
+        mix(a.markDp, b.markDp), mix(a.titleSp, b.titleSp), mix(a.versionSp, b.versionSp),
+        mix(a.headerGap, b.headerGap), mix(a.labelSp, b.labelSp), mix(a.labelW, b.labelW),
+        mix(a.pctSp, b.pctSp), mix(a.resetSp, b.resetSp), mix(a.barGap, b.barGap),
+        mix(a.barDp, b.barDp), mix(a.rowGap, b.rowGap),
+    )
+}
+
+private val REGULAR = StackDims(
+    markDp = 22f, titleSp = 14f, versionSp = 11f, headerGap = 8f,
+    labelSp = 12f, labelW = 56f, pctSp = 13f, resetSp = 11f, barGap = 3f, barDp = 5f, rowGap = 6f,
+)
+private val DENSE = StackDims(
+    markDp = 14f, titleSp = 11f, versionSp = 9f, headerGap = 2f,
+    labelSp = 10f, labelW = 48f, pctSp = 11f, resetSp = 9f, barGap = 1f, barDp = 3f, rowGap = 2f,
+)
+
 @Composable
-private fun FullLayout(s: WidgetState, showMark: Boolean, showResetPrefix: Boolean) {
+private fun FullLayout(s: WidgetState, showMark: Boolean, showResetPrefix: Boolean, d: StackDims) {
     Column(modifier = GlanceModifier.fillMaxSize()) {
         if (showMark) {
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ClaudeMark(22.dp)
+                ClaudeMark(d.markDp.dp)
                 Spacer(GlanceModifier.width(6.dp))
                 Text(
                     "Claude usage",
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurface,
                         fontWeight = FontWeight.Medium,
+                        fontSize = d.titleSp.sp,
                     ),
+                    maxLines = 1,
                 )
                 Spacer(GlanceModifier.defaultWeight())
                 // Version at the right of the header, so an update is confirmable on the
@@ -129,19 +177,19 @@ private fun FullLayout(s: WidgetState, showMark: Boolean, showResetPrefix: Boole
                     "v${s.version}",
                     style = TextStyle(
                         color = GlanceTheme.colors.onSurfaceVariant,
-                        fontSize = 11.sp,
+                        fontSize = d.versionSp.sp,
                     ),
                     maxLines = 1,
                 )
             }
-            Spacer(GlanceModifier.height(8.dp))
+            Spacer(GlanceModifier.height(d.headerGap.dp))
         }
-        MeterRow("5H", s.fiveHourPct, s.fiveHourResets, showResetPrefix)
-        Spacer(GlanceModifier.height(6.dp))
-        MeterRow("1W", s.sevenDayPct, s.sevenDayResets, showResetPrefix)
+        MeterRow("5H", s.fiveHourPct, s.fiveHourResets, showResetPrefix, d)
+        Spacer(GlanceModifier.height(d.rowGap.dp))
+        MeterRow("1W", s.sevenDayPct, s.sevenDayResets, showResetPrefix, d)
         if (s.hasModelWeekly) {
-            Spacer(GlanceModifier.height(6.dp))
-            MeterRow("1W ${s.modelWeeklyName}", s.modelWeeklyPct, s.modelWeeklyResets, showResetPrefix)
+            Spacer(GlanceModifier.height(d.rowGap.dp))
+            MeterRow("1W ${s.modelWeeklyName}", s.modelWeeklyPct, s.modelWeeklyResets, showResetPrefix, d)
         }
     }
 }
@@ -205,7 +253,7 @@ private fun ShortMeter(label: String, pct: Int, resets: String, modifier: Glance
 }
 
 @Composable
-private fun MeterRow(label: String, pct: Int, resets: String, showResetPrefix: Boolean) {
+private fun MeterRow(label: String, pct: Int, resets: String, showResetPrefix: Boolean, d: StackDims) {
     Column(modifier = GlanceModifier.fillMaxWidth()) {
         Row(
             modifier = GlanceModifier.fillMaxWidth(),
@@ -216,30 +264,30 @@ private fun MeterRow(label: String, pct: Int, resets: String, showResetPrefix: B
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurfaceVariant,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = d.labelSp.sp,
                 ),
                 maxLines = 1,
                 // Wide enough for the longest label ("1W Fable") so the bars stay aligned.
-                modifier = GlanceModifier.width(56.dp),
+                modifier = GlanceModifier.width(d.labelW.dp),
             )
             Text(
                 "$pct%",
                 style = TextStyle(
                     color = GlanceTheme.colors.onSurface,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
+                    fontSize = d.pctSp.sp,
                 ),
                 maxLines = 1,
             )
             Spacer(GlanceModifier.defaultWeight())
             Text(
                 if (showResetPrefix) "resets $resets" else resets,
-                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 11.sp),
+                style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = d.resetSp.sp),
                 maxLines = 1,
             )
         }
-        Spacer(GlanceModifier.height(3.dp))
-        Bar(pct)
+        Spacer(GlanceModifier.height(d.barGap.dp))
+        Bar(pct, height = d.barDp.dp)
     }
 }
 

@@ -1,8 +1,6 @@
 package com.usage.claudewidget.widget
 
 import android.content.Context
-import androidx.compose.ui.unit.DpSize
-import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceTheme
 import androidx.glance.appwidget.GlanceAppWidget
@@ -15,16 +13,11 @@ import kotlin.math.roundToInt
 
 class UsageWidget : GlanceAppWidget() {
 
-    // Reusable buckets; Glance maps any real size to the nearest one.
-    override val sizeMode = SizeMode.Responsive(
-        setOf(
-            DpSize(60.dp, 60.dp),    // Compact (~1x1), three mini meters
-            DpSize(60.dp, 110.dp),   // Compact + Claude mark
-            DpSize(140.dp, 50.dp),   // One row tall (~1x2 and 1x3), meters side by side
-            DpSize(180.dp, 110.dp),  // Full, three meters only
-            DpSize(180.dp, 150.dp),  // Full + Claude mark and title
-        )
-    )
+    // Exact: the layout decides from the widget's REAL size. The previous Responsive buckets
+    // made one home-screen row (a little under 110 dp) fall back to the 140x50 bucket, so a
+    // 3x1 widget could only ever get the side-by-side layout - never the stacked one with the
+    // "Claude usage" header, even though the dense stacked layout fits a single row.
+    override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         provideContent {
