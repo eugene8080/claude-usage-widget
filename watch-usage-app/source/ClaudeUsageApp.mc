@@ -41,12 +41,22 @@ class ClaudeUsageApp extends Application.AppBase {
         return [new $.ClaudeUsageServiceDelegate()];
     }
 
-    //! Ask the system to run the background publish every 5 minutes (the platform minimum).
-    //! Registering is idempotent enough to redo on each launch; the InvalidBackgroundTime
-    //! case only happens if a prior event ran too recently, which is harmless to skip.
+    //! Register the two background events that keep the complications current:
+    //!
+    //!  - the phone-message event (API 3.2+), so a push wakes the background service,
+    //!    which stores it and publishes immediately - see ClaudeUsageServiceDelegate;
+    //!  - the 5-minute temporal event (the platform minimum) as the periodic republish.
+    //!
+    //! Both registrations persist once made, but a sideload of a new .prg clears them, so
+    //! the app (or its glance) must run once after install for this to take effect.
+    //! Re-registering on every launch is harmless; the InvalidBackgroundTime case only
+    //! happens if a prior event ran too recently and is safe to skip.
     private function registerComplicationPublishing() as Void {
         if (!(Toybox has :Background)) {
             return;
+        }
+        if (Background has :registerForPhoneAppMessageEvent) {
+            Background.registerForPhoneAppMessageEvent();
         }
         try {
             Background.registerForTemporalEvent(new Time.Duration(5 * 60));
