@@ -42,6 +42,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private var _fMed as Graphics.FontType?;     // 30px          - chip values, alt-tz, seconds
     private var _fWeek as Graphics.FontType?;    // 27px          - weekday letters
     private var _fSmall as Graphics.FontType?;   // 24px          - battery %, SEC, text labels
+    private var _fTiny as Graphics.FontType?;    // 20px          - last-resort value font (corners)
     private var _fIcon as Graphics.FontType?;    // 24px          - Tabler per-field icons
     private var _fTicks as Graphics.FontType?;   // seconds-dial ticks (pre-rasterised, cg_ticks)
     private var _fWeekVec as Graphics.VectorFont?; // vector font  - weekday strip (rotatable)
@@ -82,6 +83,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
         _fMed   = WatchUi.loadResource(Rez.Fonts.CGMed) as Graphics.FontType;
         _fWeek  = WatchUi.loadResource(Rez.Fonts.CGWeek) as Graphics.FontType;
         _fSmall = WatchUi.loadResource(Rez.Fonts.CGSmall) as Graphics.FontType;
+        _fTiny  = WatchUi.loadResource(Rez.Fonts.CGTiny) as Graphics.FontType;
         _fIcon  = WatchUi.loadResource(Rez.Fonts.TablerIcon) as Graphics.FontType;
         _fTicks = WatchUi.loadResource(Rez.Fonts.CGTicks) as Graphics.FontType;
 
@@ -152,9 +154,13 @@ class ClaudeGridView extends WatchUi.WatchFace {
             var near = (slotX <= cxf) ? (slotX - (cxf - chordHalf)) : ((cxf + chordHalf) - slotX);
             var maxW = isRing ? ((s[4] as Number) * 1.6).toNumber() : (2.0 * (near - 8)).toNumber();
             if (maxW < 40) { maxW = 40; }
+            // Data 01 sits INSIDE the battery arc, whose dashes (inner radius ~209 px) close in
+            // to ~180 px wide at the text's top edge - narrower than the bezel chord above.
+            if (isHoriz && maxW > 180) { maxW = 180; }
 
-            var valueFonts = isRing ? [_fBig, _fMed]
-                                    : (isHoriz ? [_fSmall] : [_fMed, _fSmall]);
+            // Largest -> smallest; the slot picks the first that fits the row (ClaudeGridSlot).
+            var valueFonts = isRing ? [_fBig, _fMed, _fSmall]
+                                    : (isHoriz ? [_fSmall, _fTiny] : [_fMed, _fSmall, _fTiny]);
             var slot = new ClaudeGridSlot({
                 :uid => uid,
                 :kind => s[1],
@@ -168,7 +174,9 @@ class ClaudeGridView extends WatchUi.WatchFace {
                 :fIcon => _fIcon,
                 :valueFonts => valueFonts,
                 :fStacked => _fSmall,
-                :valueMaxW => maxW
+                :valueMaxW => maxW,
+                // lets the slot fit each text row to the round screen at that row's height
+                :screen => [w / 2, h / 2, w / 2]
             });
             slot.labelColor = TEXT3;
             slot.valueColor = isRing ? TEXT2 : _dataColor;   // rings=white, chips=Text 1
@@ -218,13 +226,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
             slot.valueTop = "";
             slot.valueBot = "";
 
-            if (isUnwantedType(t)) {
-                // Forecasts, race predictors, golf: still pickable (the slots allow ANY
-                // complication, which is what lets the Claude meters in) but drawn as a plain "--".
-                slot.iconChar = "";
-                slot.label = "";
-                vs = "--";
-            } else if (t == Complications.COMPLICATION_TYPE_WEEKDAY_MONTHDAY
+            if (t == Complications.COMPLICATION_TYPE_WEEKDAY_MONTHDAY
                     || t == Complications.COMPLICATION_TYPE_DATE) {
                 // Self-explanatory text: no icon, no label, just the value.
                 slot.iconChar = "";
@@ -241,6 +243,8 @@ class ClaudeGridView extends WatchUi.WatchFace {
                 vs = w[1];
             } else if (t == Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE) {
                 vs = withDegree(vs);
+            } else if (t == Complications.COMPLICATION_TYPE_TRAINING_STATUS) {
+                vs = trainingCode(vs);
             }
 
             if (t == Complications.COMPLICATION_TYPE_HIGH_LOW_TEMPERATURE) {
@@ -256,7 +260,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
                 slot.value = vs;
             }
             if (slot.kind == SlotKind.RING) {
-                slot.frac = ringFrac(cid, c.value);
+                slot.frac = ringFrac(cid, c.value, c.longLabel);
             }
         } catch (e) {
             slot.label = defaultLabel(uid);
@@ -661,9 +665,11 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var id = _slotIds[1];
         if (id != null) {
             var cid = id as Complications.Id;
-            if (isPercentMetric(cid.getType())) {
+            var comp = null;
+            try { comp = Complications.getComplication(cid); } catch (e) {}
+            if (comp != null && isPercentMetric(cid.getType(), comp.longLabel)) {
                 try {
-                    var v = Complications.getComplication(cid).value;
+                    var v = comp.value;
                     if (v instanceof Lang.Number || v instanceof Lang.Float
                         || v instanceof Lang.Double || v instanceof Lang.Long) {
                         var f = v.toFloat() / 100.0;
@@ -678,24 +684,27 @@ class ClaudeGridView extends WatchUi.WatchFace {
         return System.getSystemStats().battery / 100.0;
     }
 
+    //! Our own Claude usage meters. They are Connect IQ complications (type INVALID), but so is
+    //! every other third-party one (e.g. Quote Glance), so INVALID alone must NOT mean "a Claude
+    //! percentage" - the long label is what identifies ours ("Claude 5-hour usage", ...).
+    private function isClaudeMeter(longLabel as String or Null) as Boolean {
+        return (longLabel != null) && ((longLabel as String).find("Claude") != null);
+    }
+
     //! Types whose value is a 0-100 percentage, so the arc can gauge them directly.
-    private function isPercentMetric(t as Complications.Type or Null) as Boolean {
+    private function isPercentMetric(t as Complications.Type or Null, longLabel as String or Null) as Boolean {
         return t == Complications.COMPLICATION_TYPE_BATTERY
             || t == Complications.COMPLICATION_TYPE_BODY_BATTERY
             || t == Complications.COMPLICATION_TYPE_PULSE_OX
             || t == Complications.COMPLICATION_TYPE_STRESS
             || t == Complications.COMPLICATION_TYPE_SLEEP_SCORE
-            || t == Complications.COMPLICATION_TYPE_INVALID;  // Claude usage meters (Fable/5h/1w)
+            || (t == Complications.COMPLICATION_TYPE_INVALID && isClaudeMeter(longLabel));
     }
 
-    private function ringFrac(id as Complications.Id, v as Complications.Value or Null) as Float {
+    private function ringFrac(id as Complications.Id, v as Complications.Value or Null,
+                              longLabel as String or Null) as Float {
         var t = id.getType();
-        if (v != null && (t == Complications.COMPLICATION_TYPE_BODY_BATTERY
-                       || t == Complications.COMPLICATION_TYPE_BATTERY
-                       || t == Complications.COMPLICATION_TYPE_PULSE_OX
-                       || t == Complications.COMPLICATION_TYPE_STRESS
-                       || t == Complications.COMPLICATION_TYPE_SLEEP_SCORE
-                       || t == Complications.COMPLICATION_TYPE_INVALID)) {  // Claude % meters
+        if (v != null && isPercentMetric(t, longLabel)) {
             var f = 0.0;
             if (v instanceof Lang.Float || v instanceof Lang.Double) {
                 f = v.toFloat() / 100.0;
@@ -709,41 +718,35 @@ class ClaudeGridView extends WatchUi.WatchFace {
         return 0.66;
     }
 
+    //! Claude usage meters get a "%" suffix (their value is a bare 0-100 number).
     private function isPercentUsage(t as Complications.Type or Null, longLabel as String or Null) as Boolean {
-        if (t == Complications.COMPLICATION_TYPE_INVALID) { return true; }
-        if (longLabel != null) {
-            var s = longLabel as String;
-            if ((s.find("Claude") != null) || (s.find("usage") != null)) { return true; }
-        }
-        return false;
+        return (t == Complications.COMPLICATION_TYPE_INVALID) && isClaudeMeter(longLabel);
     }
 
+    //! Split "29°/27°" (or "29° / 27°", "29 27") into its two readings, with ALL spaces removed:
+    //! a stray space left on either side of the "/" is what staggered the stacked high/low lines.
     private function splitTwo(s as String) as Array<String>? {
         var sep = s.find("/");
         if (sep == null) { sep = s.find(" "); }
         if (sep == null) { return null; }
         var a = s.substring(0, sep);
         var b = s.substring(sep + 1, s.length());
-        if ((a == null) || (b == null) || (a.length() == 0) || (b.length() == 0)) {
+        if ((a == null) || (b == null)) { return null; }
+        a = noSpaces(a);
+        b = noSpaces(b);
+        if ((a.length() == 0) || (b.length() == 0)) {
             return null;
         }
         return [a, b];
     }
 
-    //! Complication types the face deliberately doesn't render (the user has no use for them).
-    private function isUnwantedType(t as Complications.Type or Null) as Boolean {
-        return t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_1DAY
-            || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_2DAY
-            || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_3DAY
-            || t == Complications.COMPLICATION_TYPE_RACE_PREDICTOR_5K
-            || t == Complications.COMPLICATION_TYPE_RACE_PREDICTOR_10K
-            || t == Complications.COMPLICATION_TYPE_RACE_PREDICTOR_HALF_MARATHON
-            || t == Complications.COMPLICATION_TYPE_RACE_PREDICTOR_MARATHON
-            || t == Complications.COMPLICATION_TYPE_RACE_PACE_PREDICTOR_5K
-            || t == Complications.COMPLICATION_TYPE_RACE_PACE_PREDICTOR_10K
-            || t == Complications.COMPLICATION_TYPE_RACE_PACE_PREDICTOR_HALF_MARATHON
-            || t == Complications.COMPLICATION_TYPE_RACE_PACE_PREDICTOR_MARATHON
-            || t == Complications.COMPLICATION_TYPE_LAST_GOLF_ROUND_SCORE;
+    private function noSpaces(s as String) as String {
+        var chars = s.toCharArray();
+        var out = "";
+        for (var i = 0; i < chars.size(); i++) {
+            if (chars[i] != ' ') { out += chars[i].toString(); }
+        }
+        return out;
     }
 
     //! Seconds since local midnight -> "HH:MM" (24 h) or "H:MM" (12 h). `fallback` is returned
@@ -763,6 +766,22 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var h12 = h % 12;
         if (h12 == 0) { h12 = 12; }
         return h12.format("%d") + ":" + m.format("%02d");
+    }
+
+    //! Training status as a fixed short code (a corner fits ~6 characters; the full words are
+    //! 7-12). Matched by keyword on the upper-cased value, UNPRODUCTIVE before PRODUCTIVE since it
+    //! contains it. Anything unrecognised passes through unchanged (the slot then fits it).
+    private function trainingCode(s as String) as String {
+        if (s.find("UNPROD") != null) { return "UNPROD"; }
+        if (s.find("PRODUCT") != null) { return "PROD"; }
+        if (s.find("MAINTAIN") != null) { return "MAINT"; }
+        if (s.find("RECOVER") != null) { return "RECOV"; }
+        if (s.find("DETRAIN") != null) { return "DETRN"; }
+        if (s.find("OVERREACH") != null) { return "OVRRCH"; }
+        if (s.find("PEAK") != null) { return "PEAK"; }
+        if (s.find("STRAIN") != null) { return "STRAIN"; }
+        if (s.find("NO STATUS") != null || s.find("NONE") != null) { return "--"; }
+        return s;
     }
 
     //! Append the degree sign to a numeric reading (idempotent: an existing ° is not doubled).
@@ -855,8 +874,16 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (t == Complications.COMPLICATION_TYPE_CURRENT_WEATHER
          || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_1DAY
          || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_2DAY
-         || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_3DAY) { return 0; }  // set live / hidden
+         || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_3DAY) {
+            // Current weather's icon is set live in updateSlotText. Forecasts get NO icon rather
+            // than today's condition, which would mislabel a forecast; they show their own label.
+            return 0;
+        }
         if (t == Complications.COMPLICATION_TYPE_RESPIRATION_RATE) { return 0xef62; }  // lungs
+        // Icons instead of long labels ("VO2 MAX RUN", "TRAINING STATUS") that can't fit a corner.
+        if (t == Complications.COMPLICATION_TYPE_VO2MAX_RUN) { return 0xec82; }        // runner
+        if (t == Complications.COMPLICATION_TYPE_VO2MAX_BIKE) { return 0xea36; }       // bike
+        if (t == Complications.COMPLICATION_TYPE_TRAINING_STATUS) { return 0xeb43; }   // trending-up
         if (t == Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE) { return 0xeb38; } // thermometer
         if (t == Complications.COMPLICATION_TYPE_SLEEP_SCORE) { return 0xeaf8; }
         if (t == Complications.COMPLICATION_TYPE_RECOVERY_TIME) { return 0xf228; }

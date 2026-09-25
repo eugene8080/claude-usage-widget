@@ -11,6 +11,7 @@
     <font id="CGMed"         antialias="true" filename="cg_med.fnt" />
     <font id="CGWeek"        antialias="true" filename="cg_week.fnt" />
     <font id="CGSmall"       antialias="true" filename="cg_small.fnt" />
+    <font id="CGTiny"        antialias="true" filename="cg_tiny.fnt" />
     <!-- Per-field icons from Tabler Icons (MIT), one glyph per complication type. -->
     <font id="TablerIcon"    antialias="true" filename="cg_icon.fnt" />
     <!-- Seconds-dial ticks: 60 pre-rasterised square-ended ticks on one shared cell, tinted per

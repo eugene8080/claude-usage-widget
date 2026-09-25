@@ -31,6 +31,7 @@ FONTS = [
     ("cg_med",     30, DIGITS + UPPER + SYM, 512, 0),   # chip values, alt-tz, seconds value
     ("cg_week",    27, UPPER,                256, 0),   # weekday strip letters
     ("cg_small",   24, DIGITS + UPPER + SYM, 256, 0),   # battery %, SEC label
+    ("cg_tiny",    20, DIGITS + UPPER + SYM, 256, 0),   # last-resort value font for narrow corner slots
 ]
 
 for out_base, size, chars, atlas_w, stroke in FONTS:
@@ -68,6 +69,9 @@ ICONS = [
     0xea04,   # alarm               -> alarm indicator
     0xef62,   # lungs               -> RESPIRATION_RATE
     0xeb38,   # temperature         -> CURRENT_TEMPERATURE
+    0xec82,   # run                 -> VO2MAX_RUN
+    0xea36,   # bike                -> VO2MAX_BIKE
+    0xeb43,   # trending-up         -> TRAINING_STATUS
 ]
 # CIQ addresses font glyphs by 16-bit code only, so anything Tabler files above U+FFFF is
 # re-filed under a free BMP private-use code (source glyph -> emitted id). The face must ask for

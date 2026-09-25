@@ -1,5 +1,6 @@
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Math;
 import Toybox.WatchUi;
 
 //! A data slot's visual style.
@@ -50,6 +51,9 @@ class ClaudeGridSlot extends WatchUi.Drawable {
     private var _fStacked as Graphics.FontType;  // compact font for the two stacked temp lines
     private var _valueFonts as Array;            // largest -> smallest, for auto-fit
     private var _valueMaxW as Number;            // width budget for the value
+    private var _scx as Number = 0;              // screen centre + radius, for widthAt()
+    private var _scy as Number = 0;
+    private var _sr as Number = 0;               // 0 = unknown -> fall back to _valueMaxW
 
     // text offsets, in px (tied to the fixed bitmap-font heights; from the layout editor)
     private const _CHIP_ICON_DY = 28;    // icon lifted above the value
@@ -59,7 +63,7 @@ class ClaudeGridSlot extends WatchUi.Drawable {
     private const _RING_VALUE_DY = 10;
 
     //! @param opts :uid, :kind, :cx, :cy, :ringR, :ringPen, :striped, :horizontal, :fLabel,
-    //!             :fIcon, :valueFonts (Array), :fStacked, :valueMaxW
+    //!             :fIcon, :valueFonts (Array), :fStacked, :valueMaxW, :screen ([cx, cy, r])
     function initialize(opts as Dictionary) {
         Drawable.initialize({ :identifier => opts[:uid] });
         uid = opts[:uid];
@@ -75,6 +79,12 @@ class ClaudeGridSlot extends WatchUi.Drawable {
         _valueFonts = opts[:valueFonts];
         _fStacked = opts[:fStacked];
         _valueMaxW = opts[:valueMaxW];
+        if (opts.hasKey(:screen)) {
+            var sc = opts[:screen] as Array<Number>;
+            _scx = sc[0];
+            _scy = sc[1];
+            _sr = sc[2];
+        }
     }
 
     //! Bounding box for tap hit-testing and the editor pulse animation.
@@ -94,24 +104,101 @@ class ClaudeGridSlot extends WatchUi.Drawable {
         return getBoundingBox().includesPoint(x, y);
     }
 
-    //! Largest value font whose rendering of `text` fits the width budget.
-    private function pickFont(dc as Dc, text as String) as Graphics.FontType {
-        for (var i = 0; i < _valueFonts.size(); i++) {
-            if (dc.getTextWidthInPixels(text, _valueFonts[i]) <= _valueMaxW) {
-                return _valueFonts[i];
-            }
-        }
-        return _valueFonts[_valueFonts.size() - 1];
+    //! Width (px) a line of `font` text centred on this slot's cx can use at screen row `y`
+    //! without crossing the round bezel (8 px margin), capped by the slot's own budget.
+    //!
+    //! The screen narrows with distance from its centre row, so the binding row is the text's
+    //! edge FARTHEST from centre: the top of the text for upper slots, the bottom for lower ones.
+    //! (The old single budget was measured at the slot's centre line, so a label lifted 22 px
+    //! above it - where the circle is narrower - could still run off the edge.)
+    private function widthAt(dc as Dc, y as Numeric, font as Graphics.FontType) as Number {
+        if (_sr <= 0 || kind == SlotKind.RING) { return _valueMaxW; }  // rings: interior budget
+        var hh = (dc.getFontHeight(font) * 0.32).toNumber();         // ~half the cap height
+        var yw = (y < _scy) ? (y - hh) : (y + hh);
+        var dy = (yw - _scy).toFloat();
+        var hw2 = (_sr * _sr).toFloat() - dy * dy;
+        if (hw2 <= 0.0) { return 0; }
+        var off = cx - _scx;
+        if (off < 0) { off = -off; }
+        var avail = (2.0 * (Math.sqrt(hw2) - off - 8.0)).toNumber();
+        return (avail < _valueMaxW) ? avail : _valueMaxW;
     }
 
-    //! Draw the field marker (icon if we have one + the icon font, else the text label).
+    //! Largest value font whose rendering of `text` fits at row `y`; the smallest otherwise (the
+    //! caller then shortens the text with fitText).
+    private function pickFont(dc as Dc, text as String, y as Numeric) as Graphics.FontType {
+        for (var i = 0; i < _valueFonts.size(); i++) {
+            var f = _valueFonts[i] as Graphics.FontType;
+            if (dc.getTextWidthInPixels(text, f) <= widthAt(dc, y, f)) {
+                return f;
+            }
+        }
+        return _valueFonts[_valueFonts.size() - 1] as Graphics.FontType;
+    }
+
+    //! Shorten `s` until it fits `maxW` px: whole trailing TOKENS first, then characters. A token
+    //! starts at a space, or at a +/- sign that follows a digit/space ("227.52 +0.45%" ->
+    //! "227.52", "227.52+0.45%" -> "227.52"), so a quote keeps its price and a long label keeps
+    //! its leading words ("1-DAY FORECAST" -> "1-DAY"). Returns "" if not one character fits.
+    //!
+    //! `chopNumbers` false (values): once only one token is left, text containing a digit is NEVER
+    //! cut character by character - "227.52" -> "227.5" silently changes the number, so it is
+    //! better to let it run a few px into the 8 px bezel margin.
+    private function fitText(dc as Dc, s as String, font as Graphics.FontType, maxW as Number,
+                             chopNumbers as Boolean) as String {
+        var out = s;
+        while (out.length() > 0 && dc.getTextWidthInPixels(out, font) > maxW) {
+            var chars = out.toCharArray();
+            var cut = null;
+            for (var i = chars.size() - 1; i > 0; i--) {
+                var ch = chars[i];
+                var prev = chars[i - 1];
+                if (ch == ' ') { cut = i; break; }
+                if ((ch == '+' || ch == '-') && ((prev >= '0' && prev <= '9') || prev == ' ')) {
+                    cut = i; break;
+                }
+            }
+            if (cut == null && !chopNumbers && hasDigit(out)) { break; }
+            var shorter = (cut != null) ? out.substring(0, cut) : out.substring(0, out.length() - 1);
+            out = (shorter != null) ? noTrailingSpace(shorter) : "";
+        }
+        return out;
+    }
+
+    private function hasDigit(s as String) as Boolean {
+        var chars = s.toCharArray();
+        for (var i = 0; i < chars.size(); i++) {
+            if (chars[i] >= '0' && chars[i] <= '9') { return true; }
+        }
+        return false;
+    }
+
+    private function noTrailingSpace(s as String) as String {
+        var out = s;
+        while (out.length() > 0 && out.substring(out.length() - 1, out.length()).equals(" ")) {
+            var t = out.substring(0, out.length() - 1);
+            out = (t != null) ? t : "";
+        }
+        return out;
+    }
+
+    //! Draw `value` centred at (cx, y), in the largest font that fits that row, shortened if even
+    //! the smallest doesn't.
+    private function drawValue(dc as Dc, y as Numeric, text as String) as Void {
+        var f = pickFont(dc, text, y);
+        GridDraw.text(dc, cx, y, f, fitText(dc, text, f, widthAt(dc, y, f), false),
+            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    }
+
+    //! Draw the field marker (icon if we have one + the icon font, else the text label, fitted to
+    //! the slot's width budget).
     private function drawMarker(dc as Dc, x as Numeric, y as Numeric) as Void {
         dc.setColor(labelColor, Graphics.COLOR_TRANSPARENT);
         if (!iconChar.equals("") && _fIcon != null) {
             GridDraw.text(dc, x, y, _fIcon, iconChar,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         } else if (!label.equals("")) {
-            GridDraw.text(dc, x, y, _fLabel, label,
+            GridDraw.text(dc, x, y, _fLabel, fitText(dc, label, _fLabel, widthAt(dc, y, _fLabel), true),
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
     }
@@ -127,16 +214,22 @@ class ClaudeGridSlot extends WatchUi.Drawable {
             }
             drawMarker(dc, cx, cy - _RING_ICON_DY);
             dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
-            GridDraw.text(dc, cx, cy + _RING_VALUE_DY, pickFont(dc, value), value,
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            drawValue(dc, cy + _RING_VALUE_DY, value);
         } else if (horizontal) {
             // Battery-style: an icon - or the text LABEL when the complication has no icon (the
             // Claude usage meters are icon-less, so this is what shows "FABLE" beside "55%") -
             // beside the value on one row, the pair centred on cx.
-            var vf = pickFont(dc, value);
-            var vw = dc.getTextWidthInPixels(value, vf);
+            var vf = pickFont(dc, value, cy);
+            var rowW = widthAt(dc, cy, vf);
+            var val = fitText(dc, value, vf, rowW, false);
+            var vw = dc.getTextWidthInPixels(val, vf);
             var mFont = hasIcon ? _fIcon : _fLabel;
             var marker = hasIcon ? iconChar : label;
+            if (!hasIcon && !marker.equals("")) {
+                // The label gets whatever width the value leaves; it's dropped if that's < 2 chars.
+                marker = fitText(dc, marker, _fLabel, rowW - vw - 7, true);
+                if (marker.length() < 2) { marker = ""; }
+            }
             var mw = marker.equals("") ? 0 : dc.getTextWidthInPixels(marker, mFont);
             var gap = (mw > 0) ? 7 : 0;
             var sx = cx - (mw + gap + vw) / 2;
@@ -146,7 +239,7 @@ class ClaudeGridSlot extends WatchUi.Drawable {
                     Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
             }
             dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
-            GridDraw.text(dc, sx + mw + gap, cy, vf, value,
+            GridDraw.text(dc, sx + mw + gap, cy, vf, val,
                 Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
         } else if (stacked) {
             // hi/low temperature: the two readings directly on top of each other (Iron Grit look),
@@ -165,9 +258,12 @@ class ClaudeGridSlot extends WatchUi.Drawable {
         } else {
             drawMarker(dc, cx, cy - (hasIcon ? _CHIP_ICON_DY : _CHIP_LABEL_DY));
             dc.setColor(valueColor, Graphics.COLOR_TRANSPARENT);
-            var vf = (forceFont != null) ? forceFont as Graphics.FontType : pickFont(dc, value);
-            GridDraw.text(dc, cx, cy, vf, value,
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            if (forceFont != null) {
+                GridDraw.text(dc, cx, cy, forceFont as Graphics.FontType, value,
+                    Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+            } else {
+                drawValue(dc, cy, value);
+            }
         }
     }
 }
