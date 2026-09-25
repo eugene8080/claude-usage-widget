@@ -89,7 +89,7 @@ const ICONS={"0xea34":"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGgAAABoCAY
 const IMG={}; let ready=0, total=Object.keys(ICONS).length;
 for(const k in ICONS){ const im=new Image(); im.onload=()=>{ready++; if(ready>=total) draw();}; im.src=ICONS[k]; IMG[k]=im; }
 function img(cp){ return typeof cp==="string" ? IMG[cp] : IMG["0x"+cp.toString(16)]; }
-const SZ=454, cx=SZ/2, cy=SZ/2; let GA=[181,80,47], GB=[255,192,138]; const DIM="#9a9a9a", TRACK="#3A2A22";
+const SZ=454, cx=SZ/2, cy=SZ/2; let GA=[181,80,47], GB=[255,192,138]; const DIM="#9a9a9a", TRACK="#333333";  // neutral dark grey track (= GridDraw.TRACK), theme-independent
 // What the face actually draws for each type (ClaudeGridView.updateSlotText, 2026-09-25):
 // icon = cg_icon glyph, v = sample value, lb = label shown when there's no icon,
 // bare = value only (no icon, no label), stack = high/low on two right-aligned lines.
@@ -137,30 +137,45 @@ function tzTime(city){ const z=(CITIES.find(c=>c[0]==city)||CITIES[0])[1];
   try{ return new Intl.DateTimeFormat("en-GB",{timeZone:z,hour:"2-digit",minute:"2-digit",hour12:false}).format(previewDate()); }catch(e){ return "--:--"; } }
 function valueOf(e,c){ return c ? (c.tz ? tzTime(e.city) : c.v) : ""; }
 const SEC_IDX=21;
-function defaults(){return {font:"Chivo Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",
-  hourGlow:"#ffc4a4",minGlow:"#ff6e46",   // VFD glow colours (build_glow_digits.py --hour-glow / --minute-glow)
-  vfd:false, theme:"claude",
-  arc:{span:65,dashW:10,dashLen:15,frac:0.5,rad:228},
+// Defaults = the face as built (2026-09-25): Roboto Mono, teal VFD, the layout pasted from this
+// editor. Arc radius 224 = the face's (screen radius 227 - 3); the old 228 ran past the screen edge.
+function defaults(){return {font:"Roboto Mono",accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#ffffff",grad1:"#b4eede",grad2:"#1ec693",
+  hourGlow:"#1ec693",minGlow:"#1ec693",   // VFD glow colours (build_glow_digits.py --hour-glow / --minute-glow)
+  vfd:true, theme:"grid-teal",
+  arc:{span:65,dashW:10,dashLen:15,frac:0.5,rad:224},
   el:{
   batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:24,num:24,sym:24},
   d02:{name:"Data 02 (upper-left)",kind:"chip",x:0.166,y:0.299,comp:7,num:30,sym:24},
   d03:{name:"Data 03 (upper-right)",kind:"chip",x:0.834,y:0.299,comp:1,num:30,sym:24},
-  d04:{name:"Data 04 (left ring)",kind:"ring",x:0.135,y:0.500,comp:22,ring:56,num:36,sym:24,frac:0.53},
-  d05:{name:"Data 05 (right ring)",kind:"ring",x:0.865,y:0.500,comp:23,ring:56,num:36,sym:24,frac:0.72},
+  d04:{name:"Data 04 (left ring)",kind:"ring",x:0.135,y:0.498,comp:22,ring:56,num:36,sym:24,frac:0.53},
+  d05:{name:"Data 05 (right ring)",kind:"ring",x:0.865,y:0.498,comp:23,ring:56,num:36,sym:24,frac:0.72},
   d06:{name:"Data 06 (lower-left)",kind:"chip",x:0.166,y:0.724,comp:17,num:30,sym:24},
   d08:{name:"Data 08 (lower-right)",kind:"chip",x:0.834,y:0.724,comp:25,num:30,sym:24,city:"New York"},
   sec:{name:"Data 07 (seconds dial)",kind:"tick",x:0.500,y:0.832,comp:SEC_IDX,ring:50,num:30,sym:24,frac:0.63,tick:"2px",knock:5},
-  time:{name:"Time",kind:"time",x:0.500,y:0.500,gap:56,num:139,fade:0.44},
+  time:{name:"Time",kind:"time",x:0.500,y:0.481,gap:56,num:139,fade:0.44},
   brand:{name:"Brand text",kind:"brand",x:0.500,y:0.169,num:36,text:"TACTIX"},
   alarmi:{name:"Alarm indicator",kind:"ind",x:0.166,y:0.169,sym:22,ic:0xea04},
   swatch:{name:"Stopwatch indicator",kind:"ind",x:0.834,y:0.169,sym:22,ic:0xff9b},
-  date:{name:"Date",kind:"date",x:0.500,y:0.832,num:37,gap:81},
+  date:{name:"Date",kind:"date",x:0.500,y:0.832,num:37,gap:90},
   week:{name:"Week",kind:"week",x:0.500,y:0.980,num:27,span:52},
 }};}
 let P=defaults(), sel=null, guide=null, boxes={}, lowPower=false;
 const PAIR={d02:"d03",d03:"d02",d04:"d05",d05:"d04",d06:"d08",d08:"d06"};
 function mirror(k){ if(!document.getElementById("mir").checked)return; const q=PAIR[k]; if(!q)return; const a=P.el[k],b=P.el[q]; b.x=1-a.x; b.y=a.y; if(a.ring!=null)b.ring=a.ring; if(a.num!=null)b.num=a.num; if(a.sym!=null)b.sym=a.sym; }
 const ctx=document.getElementById("c").getContext("2d"), out=document.getElementById("out");
+// Watch-faithful text placement. The face draws its text TEXT_JUSTIFY_VCENTER: CIQ puts the line
+// top at y - floor(lineHeight / 2) and the glyph baseline at line top + font ascent + 1 row (the
+// +1 measured in the simulator). The canvas "middle" baseline puts text ~4 px higher than that, so
+// every "middle" fillText is re-based here with the canvas font metrics (which equal the TTF
+// metrics the watch fonts were generated from). The time digits are placed by their ink instead
+// (TimeInk.DY on the face, inkDy() here) and bypass this via rawFill.
+const rawFill=ctx.fillText.bind(ctx);
+ctx.fillText=function(s,x,y,mw){
+  if(ctx.textBaseline!=="middle") return mw===undefined?rawFill(s,x,y):rawFill(s,x,y,mw);
+  // measure AFTER switching to the alphabetic baseline: fontBoundingBox* are relative to the
+  // current textBaseline, so under "middle" they are not the font's ascent/descent at all.
+  ctx.textBaseline="alphabetic"; const m=ctx.measureText(s), A=m.fontBoundingBoxAscent, D=m.fontBoundingBoxDescent;
+  rawFill(s,x,Math.round(y)-Math.floor((A+D)/2)+A+1); ctx.textBaseline="middle"; };
 function lerp(a,b,t){return `rgb(${Math.round(a[0]+(b[0]-a[0])*t)},${Math.round(a[1]+(b[1]-a[1])*t)},${Math.round(a[2]+(b[2]-a[2])*t)})`;}
 function num(px){return px+"px '"+P.font+"',monospace";}
 function hexRgb(h){ h=(h||"#000000").replace("#",""); return [parseInt(h.slice(0,2),16)||0,parseInt(h.slice(2,4),16)||0,parseInt(h.slice(4,6),16)||0]; }
@@ -187,11 +202,15 @@ function battArc(){ const a=P.arc, r=a.rad, n=16, lit=Math.round(n*a.frac), st=9
   for(let i=0;i<n;i++){ const ang=(st-(st-en)*i/(n-1))*Math.PI/180, c=Math.cos(ang), s=Math.sin(ang);
     ctx.strokeStyle=i<lit?lerp(GA,GB,i/n):TRACK; ctx.beginPath(); ctx.moveTo(cx+r*c,cy-r*s); ctx.lineTo(cx+(r-a.dashLen)*c,cy-(r-a.dashLen)*s); ctx.stroke(); }
 }
-function tabular(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; let cw=0;
+// Time digits are placed by their INK centre (actualBoundingBox), not the canvas "middle"
+// baseline - "middle" puts each font's digits at a different height (Roboto Mono 8.6 px high).
+// The face does the same with its generated TimeInk.DY, so the two agree for any typeface.
+function inkDy(){ const m=ctx.measureText("0123456789"); return (m.actualBoundingBoxAscent-m.actualBoundingBoxDescent)/2; }
+function tabular(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; y+=inkDy(); let cw=0;
   for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2;
-  for(let i=0;i<str.length;i++){ ctx.fillStyle=color; ctx.fillText(str[i],sx+cw*(i+0.5),y); } }
+  for(let i=0;i<str.length;i++){ ctx.fillStyle=color; rawFill(str[i],sx+cw*(i+0.5),y); } }
 // Always-on outline time: 2 px, like the face's regenerated cg_time_o (was ~5.5 px here).
-function tabularStroke(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineWidth=2; let cw=0; for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2; for(let i=0;i<str.length;i++){ ctx.strokeStyle=color; ctx.strokeText(str[i],sx+cw*(i+0.5),y); } }
+function tabularStroke(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; y+=inkDy(); ctx.lineWidth=2; let cw=0; for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2; for(let i=0;i<str.length;i++){ ctx.strokeStyle=color; ctx.strokeText(str[i],sx+cw*(i+0.5),y); } }
 function symbol(e,x,y){ const c=COMPS[e.comp], s=e.sym;
   if(c && c.bare) return;
   if(c && c.ic!=null){ const im=img(c.ic); if(im&&im.complete) tintIcon(im,x,y,s,P.text3); return; }
@@ -357,6 +376,7 @@ bindR("adlR","adlRV",0,v=>{P.arc.dashLen=v;});
 // gradient/rings/glows = a pair of the theme's accents, accent = its vivid highlight.
 // The watch background stays black (AMOLED) in every theme.
 const THEMES=[
+ ["grid-teal","Claude Grid teal (current face)",{accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#ffffff",grad1:"#b4eede",grad2:"#1ec693",hourGlow:"#1ec693",minGlow:"#1ec693"}],
  ["claude","Claude",{accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",hourGlow:"#ffc4a4",minGlow:"#ff6e46"}],
  ["iv22","IV-22 (VFD teal)",{accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#a4f5e1",grad1:"#5fe3bd",grad2:"#1ec693",hourGlow:"#1ec693",minGlow:"#1ec693"}],
  ["github-dark","GitHub Dark",{accent:"#f78166",text1:"#79c0ff",text2:"#e6edf3",text3:"#8b949e",hourCol:"#e6edf3",grad1:"#58a6ff",grad2:"#bc8cff",hourGlow:"#a5d6ff",minGlow:"#58a6ff"}],

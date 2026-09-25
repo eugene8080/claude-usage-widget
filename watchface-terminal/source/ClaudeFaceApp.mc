@@ -18,7 +18,16 @@ class ClaudeFaceApp extends Application.AppBase {
     public function onStop(state as Dictionary?) as Void {
     }
 
+    private var _view as ClaudeFaceView? = null;
+
     public function getInitialView() as [Views] or [Views, InputDelegates] {
-        return [new $.ClaudeFaceView()];
+        _view = new $.ClaudeFaceView();
+        return [_view as ClaudeFaceView];
+    }
+
+    //! Garmin Connect settings saved (show seconds, prompt text): re-read and redraw.
+    public function onSettingsChanged() as Void {
+        if (_view != null) { (_view as ClaudeFaceView).readSettings(); }
+        WatchUi.requestUpdate();
     }
 }

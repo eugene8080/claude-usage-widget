@@ -2,6 +2,7 @@ import Toybox.Application;
 import Toybox.Complications;
 import Toybox.Graphics;
 import Toybox.Lang;
+import Toybox.Math;
 import Toybox.System;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
@@ -44,6 +45,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private var _ids as Array<Complications.Id?> = [null, null, null];
     private var _subscribed as Boolean = false;
     private var _showSeconds as Boolean = false;
+    private var _prompt as String = "claude ~ %";   // PromptText setting (Garmin Connect / editor)
 
     // Share Tech Mono, loaded from resources - the terminal typeface for every element.
     private var _fontText as Graphics.FontType?;
@@ -75,10 +77,41 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         }
     }
 
-    //! The "show seconds" toggle, from the watch/app settings.
-    private function readSettings() as Void {
+    //! The "show seconds" toggle and the prompt text, from the watch/app settings.
+    public function readSettings() as Void {
         var v = Application.Properties.getValue("ShowSeconds");
         _showSeconds = (v instanceof Boolean) ? v : false;
+        var p = Application.Properties.getValue("PromptText");
+        _prompt = (p instanceof String) ? p as String : "claude ~ %";
+    }
+
+    // ---- whole-pixel drawing -----------------------------------------------------------------
+    // Every position here is a fraction of the screen, i.e. a Float. With anti-aliasing on, a
+    // fractional origin risks a glyph or bar edge being spread across two pixel rows/columns
+    // (soft text, blurry bar ends). These helpers resolve everything to integer pixels first.
+
+    private function px(v as Numeric) as Number {
+        return Math.round(v.toFloat()).toNumber();
+    }
+
+    //! Pixel-snapped drawText with top-aligned text (the terminal's convention): the
+    //! justification is resolved to an integer left edge against the measured width.
+    private function text(dc as Dc, x as Numeric, y as Numeric, font as Graphics.FontType,
+                          s as String, just as Number) as Void {
+        var left = px(x);
+        if (just == Graphics.TEXT_JUSTIFY_CENTER) {
+            left -= dc.getTextWidthInPixels(s, font) / 2;
+        } else if (just == Graphics.TEXT_JUSTIFY_RIGHT) {
+            left -= dc.getTextWidthInPixels(s, font);
+        }
+        dc.drawText(left, px(y), font, s, Graphics.TEXT_JUSTIFY_LEFT);
+    }
+
+    //! Pixel-snapped filled rectangle: integer edges, so bar ends are hard.
+    private function rect(dc as Dc, x as Numeric, y as Numeric, w as Numeric, h as Numeric) as Void {
+        var x0 = px(x);
+        var y0 = px(y);
+        dc.fillRectangle(x0, y0, px(x + w) - x0, px(y + h) - y0);
     }
 
     private function findAndSubscribe() as Void {
@@ -153,9 +186,9 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
         dc.clear();
 
-        // Prompt line, Claude orange.
+        // Prompt line (the PromptText setting), accent colour.
         dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w * PROMPT_X, h * PROMPT_Y, ft(), "claude ~ %", Graphics.TEXT_JUSTIFY_CENTER);
+        text(dc, w * PROMPT_X, h * PROMPT_Y, ft(), _prompt, Graphics.TEXT_JUSTIFY_CENTER);
 
         drawTime(dc, w, h);
 
@@ -163,7 +196,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         var dateStr = info.day_of_week + " " + info.month + " " + info.day.format("%d");
         dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w * DATE_X, h * DATE_Y, ft(), dateStr, Graphics.TEXT_JUSTIFY_CENTER);
+        text(dc, w * DATE_X, h * DATE_Y, ft(), dateStr, Graphics.TEXT_JUSTIFY_CENTER);
 
         // Three CLI rows.
         for (var i = 0; i < 3; i++) {
@@ -173,14 +206,21 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         // Blinking cursor.
         if (System.getClockTime().sec % 2 == 0) {
             dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(w * CURSOR_X - w * CURSOR_W / 2.0, h * CURSOR_Y, w * CURSOR_W, h * CURSOR_H);
+            rect(dc, w * CURSOR_X - w * CURSOR_W / 2.0, h * CURSOR_Y, w * CURSOR_W, h * CURSOR_H);
         }
+
+        // VFD build: one screen-aligned mesh over everything, drawn last (no-op otherwise).
+        drawMeshOverlay(dc, w, h, 0, 0, w, h);
     }
 
     //! Seconds tick here when the device allows partial updates; onUpdate handles the rest.
     public function onPartialUpdate(dc as Dc) as Void {
         if (_showSeconds) {
-            drawTime(dc, dc.getWidth(), dc.getHeight());
+            var w = dc.getWidth();
+            var h = dc.getHeight();
+            drawTime(dc, w, h);
+            // re-mesh just the repainted time band (same lattice, so it lines up with the rest)
+            drawMeshOverlay(dc, w, h, 0, px(h * TIME_Y) - 3, w, px(h * 0.200));
         }
     }
 
@@ -197,49 +237,100 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         }
         // Repaint just the time band first so onPartialUpdate doesn't smear seconds (kept clear of
         // the prompt above and the date below).
-        var ty = h * TIME_Y;
+        var ty = px(h * TIME_Y);
         dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.fillRectangle(0, ty - 3, w, h * 0.200);
-        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(0, ty - 3, w, px(h * 0.200));
         var font = (_fontTime != null) ? _fontTime : Graphics.FONT_NUMBER_MEDIUM;
-        dc.drawText(w * TIME_X, ty, font, t, Graphics.TEXT_JUSTIFY_CENTER);
+        if (_fontTime != null && drawGlowTime(dc, px(w * TIME_X), ty, font, t)) {
+            return;
+        }
+        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+        text(dc, w * TIME_X, ty, font, t, Graphics.TEXT_JUSTIFY_CENTER);
+    }
+
+    // ---- VFD style (optional build, selected in monkey.jungle) ---------------------------------
+    // Same scheme as Claude Grid: the time drawn from pre-rendered glow bitmaps (source-glow/ +
+    // resources-glow/, tools/build_glow_time.py) and one mesh tile tiled over the whole face
+    // (resources-mesh/). The annotations pick the implementation compiled in.
+
+    (:glow_time)
+    private function drawGlowTime(dc as Dc, cx as Number, top as Number, font as Graphics.FontType,
+                                  t as String) as Boolean {
+        GlowTime.draw(dc, cx, top, font, t);
+        return true;
+    }
+
+    (:font_time)
+    private function drawGlowTime(dc as Dc, cx as Number, top as Number, font as Graphics.FontType,
+                                  t as String) as Boolean {
+        return false;
+    }
+
+    (:mesh_overlay)
+    private var _meshTile = null;
+
+    //! Tile the mesh over the given screen rectangle (clipped to it), tiles anchored at the screen
+    //! origin so every call hits the same lattice.
+    (:mesh_overlay)
+    private function drawMeshOverlay(dc as Dc, w as Number, h as Number, x as Number, y as Number,
+                                     cw as Number, ch as Number) as Void {
+        if (_meshTile == null) {
+            _meshTile = WatchUi.loadResource(Rez.Drawables.MeshTile);
+        }
+        var s = (_meshTile as Graphics.BitmapReference).getWidth();
+        if (s <= 0) { return; }
+        dc.setClip(x, y, cw, ch);
+        for (var ty = (y / s) * s; ty < y + ch; ty += s) {
+            for (var tx = (x / s) * s; tx < x + cw; tx += s) {
+                dc.drawBitmap(tx, ty, _meshTile);
+            }
+        }
+        dc.clearClip();
+    }
+
+    (:plain_overlay)
+    private function drawMeshOverlay(dc as Dc, w as Number, h as Number, x as Number, y as Number,
+                                     cw as Number, ch as Number) as Void {
     }
 
     //! One row: label, bar, percentage, reset time. Columns are fixed fractions of the width so the
-    //! three rows align and stay within the round bezel's safe band.
+    //! three rows align and stay within the round bezel's safe band. Everything is snapped to whole
+    //! pixels - the bars especially, whose fractional edges used to render soft.
     private function drawRow(dc as Dc, slot as Number, w as Numeric, h as Numeric, yf as Float) as Void {
         var y = h * yf;
         var pct = _pcts[slot];
 
         dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(w * LABEL_X, y, ft(), _labels[slot], Graphics.TEXT_JUSTIFY_LEFT);
+        text(dc, w * LABEL_X, y, ft(), _labels[slot], Graphics.TEXT_JUSTIFY_LEFT);
 
-        // Bar.
-        var bx = w * BAR_X;
-        var bw = w * BAR_W;
-        var by = y + w * BAR_DY;
-        var bh = w * BAR_H;
+        // Bar: integer track, and an integer-width fill measured from the same left edge.
+        var bx = px(w * BAR_X);
+        var bw = px(w * BAR_W);
+        var by = px(y + w * BAR_DY);
+        var bh = px(w * BAR_H);
         dc.setColor(TRACK, Graphics.COLOR_TRANSPARENT);
         dc.fillRectangle(bx, by, bw, bh);
         if (pct >= 0) {
             var clamped = (pct > 100) ? 100 : pct;
-            dc.setColor(pct >= 80 ? NEAR_CAP : ACCENT, Graphics.COLOR_TRANSPARENT);
-            dc.fillRectangle(bx, by, bw * clamped / 100.0, bh);
+            var fw = px(bw * clamped / 100.0);
+            if (fw > 0) {
+                dc.setColor(pct >= 80 ? NEAR_CAP : ACCENT, Graphics.COLOR_TRANSPARENT);
+                dc.fillRectangle(bx, by, fw, bh);
+            }
         }
 
         // Percentage.
         dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
         var pctTxt = (pct >= 0) ? (pct.toString() + "%") : "--";
-        dc.drawText(w * PCT_X, y, ft(), pctTxt, Graphics.TEXT_JUSTIFY_RIGHT);
+        text(dc, w * PCT_X, y, ft(), pctTxt, Graphics.TEXT_JUSTIFY_RIGHT);
 
         // Reset time.
         var reset = resetsAt(_resets[slot]);
         if (!reset.equals("")) {
             dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(w * RESET_X, y, ft(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
+            text(dc, w * RESET_X, y, ft(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
         }
     }
-
     //! Absolute reset time, the way the phone and glance state it: clock time within a day,
     //! weekday within the week, month/day beyond. Empty when no reset is known.
     private function resetsAt(epochSec as Number) as String {

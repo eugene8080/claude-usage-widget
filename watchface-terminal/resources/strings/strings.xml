@@ -1,4 +1,5 @@
 <strings>
     <string id="AppName">Claude Terminal</string>
     <string id="showSecondsTitle">Show seconds</string>
+    <string id="promptTextTitle">Prompt text (top line)</string>
 </strings>

@@ -1,14 +1,24 @@
 project.manifest = manifest.xml
 
-base.sourcePath = source
-base.resourcePath = resources
-# Font-drawn time, no mesh overlay. The experiment builds (tools/build_sharpness_variants.py)
-# rewrite this: glow digits exclude font_time and add source-glow/ + a resources-glow*/ folder;
-# the full-face VFD mesh excludes plain_overlay and adds resources-mesh/.
-base.excludeAnnotations = glow_time;mesh_overlay
+# Default build = the VFD face (2026-09-25): glowing bitmap time (source-glow/ + the digit images
+# in resources-glow-vfd/) and the full-face mesh overlay (resources-mesh/). The two annotations
+# pick which implementation of drawGlowTime / drawMeshOverlay is compiled in:
+#   font_time     - plain font-drawn time        (excluded here -> bitmap time)
+#   plain_overlay - no mesh                      (excluded here -> mesh overlay)
+# tools/build_sharpness_variants.py rewrites these three lines for its test faces.
+base.sourcePath = source;source-glow
+base.resourcePath = resources;resources-glow-vfd;resources-mesh
+base.excludeAnnotations = font_time;plain_overlay
 
 fenix847mm.resourcePath = $(base.resourcePath);resources-round-454x454
 fenix8pro47mm.resourcePath = $(base.resourcePath);resources-round-454x454
 fenix843mm.resourcePath = $(base.resourcePath);resources-round-416x416
-fenix8solar47mm.resourcePath = $(base.resourcePath);resources-round-260x260
-fenix8solar51mm.resourcePath = $(base.resourcePath);resources-round-280x280
+
+# The Solar models have a low-colour memory-in-pixel (MIP) display, not AMOLED: no smooth alpha
+# glow and no point in a dimming mesh. They keep the plain font time without the overlay.
+fenix8solar47mm.sourcePath = source
+fenix8solar47mm.resourcePath = resources;resources-round-260x260
+fenix8solar47mm.excludeAnnotations = glow_time;mesh_overlay
+fenix8solar51mm.sourcePath = source
+fenix8solar51mm.resourcePath = resources;resources-round-280x280
+fenix8solar51mm.excludeAnnotations = glow_time;mesh_overlay

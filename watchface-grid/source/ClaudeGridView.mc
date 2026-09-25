@@ -11,7 +11,7 @@ import Toybox.Time.Gregorian;
 import Toybox.WatchUi;
 import Toybox.Weather;
 
-//! "Claude Grid" - a data face in Chivo Mono built to the HTML layout editor's finalized design.
+//! "Claude Grid" - a data face in Roboto Mono built to the HTML layout editor's finalized design.
 //! Big stacked time (solid white hour over a Gradient 1->2 minute), a brand line, a battery arc
 //! on the bezel, a live 60-tick seconds sub-dial, a second time zone (New York, via LocalMoment
 //! so DST is automatic), the date flanking the dial, a curved weekday strip, and six user-editable
@@ -26,15 +26,19 @@ import Toybox.Weather;
 class ClaudeGridView extends WatchUi.WatchFace {
 
     // --- palette (from the layout editor) ---------------------------------------------------
-    private const TEXT2 = 0xFFFFFF;               // ring values + date
-    private const TEXT3 = 0x9A9A9A;               // icons, labels, weekday strip, brand, SEC
+    // Teal VFD palette from the layout editor (2026-09-25, IV-22-based). The Claude orange original
+    // is the editor's "Claude" theme: TEXT2 FFFFFF, TEXT3 9A9A9A, accent FF531A, data FF9C75.
+    private const TEXT2 = 0x7FE8C8;               // ring values + date
+    private const TEXT3 = 0x13916B;               // icons, labels, weekday strip, brand, SEC
     private const HOUR_COL = 0xFFFFFF;            // hour digits (solid)
-    private const _DEFAULT_ACCENT = 0xFF531A;    // today's weekday + seconds value
-    private const _DEFAULT_DATA = 0xFF9C75;      // chip values (Text 1)
+    private const _DEFAULT_ACCENT = 0xA4F5E1;    // today's weekday + seconds value
+    private const _DEFAULT_DATA = 0x1EC693;      // chip values (Text 1)
 
-    private const TIME_GAP = 56;                 // HH / MM each this far from the vertical centre
+    private const TIME_GAP = 56;                 // HH / MM digit centres each this far from TIME_Y
+    private const TIME_Y = 0.481;                // time block centre (fraction of height), = editor
     private const DIAL_R = 50;                   // seconds-dial tick outer radius (= tick font R_OUT)
     private const DIAL_CLEAR_R = 55;             // knockout disc: DIAL_R + a 5 px black gap
+    private const DATE_GAP = 90;                 // month / day each this far either side of the dial
 
     private var _fTime as Graphics.FontType?;    // 139px digits  - the clock
     private var _fTimeO as Graphics.FontType?;   // 139px outline - always-on clock
@@ -44,6 +48,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private var _fSmall as Graphics.FontType?;   // 24px          - battery %, SEC, text labels
     private var _fTiny as Graphics.FontType?;    // 20px          - last-resort value font (corners)
     private var _fIcon as Graphics.FontType?;    // 24px          - Tabler per-field icons
+    private var _fArc as Graphics.FontType?;     // battery-arc dashes (pre-rasterised, cg_arc, 454 px)
     private var _fTicks as Graphics.FontType?;   // seconds-dial ticks (pre-rasterised, cg_ticks)
     private var _fWeekVec as Graphics.VectorFont?; // vector font  - weekday strip (rotatable)
 
@@ -86,6 +91,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
         _fTiny  = WatchUi.loadResource(Rez.Fonts.CGTiny) as Graphics.FontType;
         _fIcon  = WatchUi.loadResource(Rez.Fonts.TablerIcon) as Graphics.FontType;
         _fTicks = WatchUi.loadResource(Rez.Fonts.CGTicks) as Graphics.FontType;
+        _fArc   = WatchUi.loadResource(Rez.Fonts.CGArc) as Graphics.FontType;
 
         // A vector font for the weekday strip - the only way to draw ROTATED (curved) text on
         // CIQ; bitmap fonts can't rotate. Guarded so older devices fall back to upright letters.
@@ -104,6 +110,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
 
         var settings = WatchFaceConfig.getSettings(null);
         if (settings != null) {
+            seedConfig(settings);
             updateConfiguration(settings, null);
         }
 
@@ -128,8 +135,8 @@ class ClaudeGridView extends WatchUi.WatchFace {
             [1, SlotKind.CHIP, 0.500, 0.092, 0,     0, true,  Complications.COMPLICATION_TYPE_BATTERY],
             [2, SlotKind.CHIP, 0.166, 0.299, 0,     0, false, Complications.COMPLICATION_TYPE_HIGH_LOW_TEMPERATURE],
             [3, SlotKind.CHIP, 0.834, 0.299, 0,     0, false, Complications.COMPLICATION_TYPE_STEPS],
-            [4, SlotKind.RING, 0.135, 0.500, ringR, 6, false, Complications.COMPLICATION_TYPE_HEART_RATE],
-            [5, SlotKind.RING, 0.865, 0.500, ringR, 6, false, Complications.COMPLICATION_TYPE_BODY_BATTERY],
+            [4, SlotKind.RING, 0.135, 0.498, ringR, 6, false, Complications.COMPLICATION_TYPE_HEART_RATE],
+            [5, SlotKind.RING, 0.865, 0.498, ringR, 6, false, Complications.COMPLICATION_TYPE_BODY_BATTERY],
             [6, SlotKind.CHIP, 0.166, 0.724, 0,     0, false, Complications.COMPLICATION_TYPE_CURRENT_WEATHER],
             // Data 08: NO seeded default - while nothing is picked it shows the time-zone clock
             // (see refreshAltTz). Same centre the fixed alt-tz field used, so the look is unchanged.
@@ -183,6 +190,35 @@ class ClaudeGridView extends WatchUi.WatchFace {
             _slots.add(slot);
             if (s[7] != null) {
                 _slotIds[uid] = new Complications.Id(s[7] as Complications.Type);
+            }
+        }
+    }
+
+    //! Write the face's per-slot defaults into the SAVED watch-face config, for slots that are still
+    //! unset. Garmin's on-watch editor only knows the saved config: a fresh one has every slot
+    //! empty, which the editor shows - and saves - as Battery, so the first edit turned all seven
+    //! fields into Battery (reproduced in the simulator's Watch Face Editor). Seeding makes the
+    //! editor open on exactly what the face was showing. Slots the user has set are never touched,
+    //! and Data 08 has no default (its unset state IS the time-zone clock), so it isn't seeded.
+    private function seedConfig(settings as WatchFaceConfig.Settings) as Void {
+        var comps = settings.complicationSettings;
+        if (comps == null) { return; }
+        var changed = false;
+        for (var i = 0; i < comps.size(); i++) {
+            var entry = comps[i];
+            var uid = entry.uniqueIdentifier;
+            if (uid == null || entry.complicationId != null) { continue; }
+            var seed = _slotIds[uid];
+            if (seed != null) {
+                entry.complicationId = seed as Complications.Id;
+                changed = true;
+            }
+        }
+        if (changed) {
+            try {
+                WatchFaceConfig.setSettings(null, settings);
+            } catch (e) {
+                System.println("seedConfig: setSettings failed");
             }
         }
     }
@@ -346,7 +382,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
 
         // Arc on the bezel: gauges Data 01's percentage (e.g. Claude Fable 55%), falling back to
         // the system battery when Data 01 isn't a 0-100 metric. Sweeps in with the rings on wake.
-        GridDraw.segmentArc(dc, cx, cy, cx - 3, 122.5, 57.5, 16, battArcFrac() * ringSweep, 10, 15);
+        GridDraw.segmentArc(dc, cx, cy, cx - 3, 122.5, 57.5, 16, battArcFrac() * ringSweep, 10, 15, _fArc);
 
         // The seven editable slots (skip the one the editor is currently pulsing). Data 08 is
         // re-filled with the time-zone clock first when that's what it should show.
@@ -359,7 +395,9 @@ class ClaudeGridView extends WatchUi.WatchFace {
             slot.draw(dc);
         }
 
-        drawTime(dc, cx, cy);
+        // Anchor the time by its digit INK (TimeInk.DY, generated with the fonts), so the digits are
+        // centred on TIME_Y whatever the typeface - exactly as the layout editor draws them.
+        drawTime(dc, cx, (h * TIME_Y).toNumber() - TimeInk.DY);
         drawBrand(dc, cx, (h * 0.169).toNumber());
         drawIndicators(dc, w, h);
 
@@ -558,9 +596,9 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         dc.setColor(TEXT2, Graphics.COLOR_TRANSPARENT);
         var f = (_fBig != null) ? _fBig : Graphics.FONT_TINY;
-        GridDraw.text(dc, cx - 81, y, f, (info.month as String).toUpper(),
+        GridDraw.text(dc, cx - DATE_GAP, y, f, (info.month as String).toUpper(),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        GridDraw.text(dc, cx + 81, y, f, info.day.format("%d"),
+        GridDraw.text(dc, cx + DATE_GAP, y, f, info.day.format("%d"),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -893,7 +931,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
 
     //! Weather condition -> icon glyph in cg_icon. `night` swaps the sun for the moon on the clear
     //! and partly-cloudy icons. 0xE001 / 0xE002 are the composited cloud-with-sun / cloud-with-moon
-    //! (tools/build_fonts_chivo.py) - Tabler has no partly-cloudy icon of its own.
+    //! (tools/build_fonts_grid.py) - Tabler has no partly-cloudy icon of its own.
     private function weatherGlyph(c as Number, night as Boolean) as Number {
         if (c == Weather.CONDITION_CLEAR || c == Weather.CONDITION_FAIR
          || c == Weather.CONDITION_MOSTLY_CLEAR) {

@@ -35,6 +35,10 @@ embedded as images, only the mono web-fonts load from Google Fonts). Then:
   not part of the settings block.
 - **VFD style** previews test face I: glowing time + one 3 px mesh over the whole face.
   **Low-power preview** shows always-on: the 2 px outline time and the stacked date in the knockout.
+- Text is placed by the watch's own rule (VCENTER: line top = y - lineHeight/2, baseline = line
+  top + font ascent + 1 row; the time by its digit ink, as `TimeInk.DY` does on the face), so the
+  preview matches the simulator to within a pixel. The ring / arc / tick track is a neutral dark
+  grey (#333333) whatever the theme.
 - Complications preview what the face actually draws: weather = condition icon + temperature,
   high/low = two right-aligned lines, VO2 max run/bike and training status = icons (status as a
   short code such as PROD), day of week / date = text only, Quote Glance = price only.

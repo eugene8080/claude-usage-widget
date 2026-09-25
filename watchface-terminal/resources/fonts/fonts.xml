@@ -1,5 +1,5 @@
 <fonts>
-    <!-- Share Tech Mono, generated from the TTF into CIQ bitmap fonts by tools/build_fonts_stm.py.
+    <!-- Share Tech Mono, generated from the TTF into CIQ bitmap fonts by tools/build_fonts_terminal.py.
          The text font carries the full printable-ASCII set (prompt, date, labels, %, reset times);
          the time font is digits + colon only, at 90px, to stay small.
          antialias="true" is REQUIRED - without it CIQ thresholds the atlas alpha to 1-bit and the

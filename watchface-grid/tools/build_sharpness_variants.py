@@ -13,9 +13,10 @@ I stages source-glow/ + resources-glow-vfd/ (bitmap time, from tools/build_glow_
 resources-mesh/ (mesh tile) and resources-ticks-taper/ (tools/build_tick_font.py), and rewrites the
 jungle's excludeAnnotations to pick the glow/mesh implementations.
 
-"current" = this working tree; "baseline" = the same files at git ref BASE_REF (default master).
+"current" = this working tree; "baseline" = the same files at git ref BASE_REF (default d376685,
+the last commit before the sharpness work - master itself now carries all the fixes).
 0 takes both from the baseline:
-    fonts  -> resources/fonts/cg_*.fnt + cg_*_0.png   (tools/genfont.py, build_fonts_chivo.py)
+    fonts  -> resources/fonts/cg_*.fnt + cg_*_0.png   (tools/genfont.py, build_fonts_grid.py)
     source -> source/*.mc
 
 Outputs  dist/variants/ClaudeGrid-<tag>-<device>.prg  (dist/ is gitignored).
@@ -141,8 +142,10 @@ def stage(v: Variant, base_ref: str) -> Path:
                              re.compile(r"source/[^/]+\.mc$"))
         log.info("  [%s] source <- %s (%d files)", v.tag, base_ref, n)
 
-    if v.glow_res or v.mesh:
-        if not v.pixels_fixed:
+    # The jungle is rewritten for EVERY test face: since 2026-09-25 the default build is the VFD
+    # face, so a plain font-time face (C, 0) must switch the glow/mesh off explicitly too.
+    if True:
+        if (v.glow_res or v.mesh) and not v.pixels_fixed:
             raise RuntimeError("%s: glow digits / mesh need the current source" % v.tag)
         # Each feature is an (annotation pair, extra folders) switch; the jungle is rewritten so
         # the chosen implementation of drawGlowTime / drawMeshOverlay is the one compiled in.
@@ -212,7 +215,9 @@ def build(v: Variant, root: Path, sdk: Path, device: str, release: bool) -> Path
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--base", default="master", help="git ref for the unfixed baseline (default master)")
+    # Baseline = the face as it was before the sharpness work (the last commit before the
+    # exp/grid-sharpness merge), i.e. the build that was on the watch on 2026-09-25.
+    ap.add_argument("--base", default="d376685", help="git ref for the unfixed baseline (default d376685)")
     ap.add_argument("--device", default="fenix847mm", help="CIQ device id (fenix847mm = tactix 8 47/51mm)")
     ap.add_argument("--only", default="0,C,I", help="comma-separated variant tags to build")
     ap.add_argument("--debug", action="store_true", help="debug build instead of release (-r)")
