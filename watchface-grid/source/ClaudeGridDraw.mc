@@ -8,8 +8,8 @@ import Toybox.Math;
 module GridDraw {
 
     const TRACK = 0x333333;   // ring/arc/tick background: neutral dark grey, so it suits any theme
-    const GRAD_A = 0xB4EEDE;  // Gradient 1 (pale teal)  - top of the fill   (Claude theme: FF9255)
-    const GRAD_B = 0x1EC693;  // Gradient 2 (IV-22 teal) - end of the fill   (Claude theme: FF3C3B)
+    const GRAD_A = 0xFF7EDB;  // Gradient 1 (synthwave pink)  - top of the fill   (teal: B4EEDE, Claude: FF9255)
+    const GRAD_B = 0xF97E72;  // Gradient 2 (synthwave coral) - end of the fill   (teal: 1EC693, Claude: FF3C3B)
 
     //! Linear interpolate between two 0xRRGGBB colours.
     function lerp(a as Number, b as Number, t as Float) as Number {

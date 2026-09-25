@@ -4,7 +4,7 @@
 // Y0 includes the +1 row calibration CIQ applies to font glyphs (see Y_CALIBRATION).
 module GlowTimeMetrics {
     const X0 = -18;
-    const Y0 = 28;
-    const W = 119;
-    const H = 138;
+    const Y0 = 31;
+    const W = 128;
+    const H = 147;
 }

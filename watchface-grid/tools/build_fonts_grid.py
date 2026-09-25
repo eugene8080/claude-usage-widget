@@ -1,12 +1,14 @@
 """Regenerate every text bitmap font the Claude Grid face needs, into resources/fonts.
 
 The face's typeface is the (TTF, FACE, WEIGHT) setting below - swap it to change the whole face.
-Current: Roboto Mono Regular (400), chosen in the layout editor on 2026-09-25. The previous face,
-Chivo Mono Medium (500), is kept in tools/ - set TTF/FACE/WEIGHT back to switch.
+Current: IBM Plex Mono Regular (static TTF), the synthwave design from the layout editor, 2026-09-25.
+Before it: Roboto Mono Regular (400), and before that Chivo Mono Medium (500) - both kept in tools/;
+set TTF/FACE/WEIGHT back to switch.
 
-Both are variable fonts (weight axis); we pin one weight per atlas. Sizes come straight from the
+Those two are variable fonts (weight axis), pinned to one weight per atlas; IBM Plex Mono is a
+static TTF, so WEIGHT is None. Sizes come straight from the
 layout editor's final numbers. Each atlas carries only the glyphs its fields draw so the big sizes
-stay small (the 139px time and its outline are digits only). Run tools/build_glow_digits.py
+stay small (the 153px time and its outline are digits only). Run tools/build_glow_digits.py
 afterwards: the VFD time bitmaps are cut from cg_time.
 
 Run from the watchface-grid directory:  python tools/build_fonts_grid.py
@@ -18,9 +20,11 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(__file__)
 OUT = os.path.join(HERE, "..", "resources", "fonts")
 # --- the face's typeface ---------------------------------------------------------------------
-TTF = os.path.join(HERE, "RobotoMono-VariableFont_wght.ttf")   # OFL - tools/RobotoMono-OFL.txt
-FACE = "Roboto Mono"
-WEIGHT = 400  # Regular - what the editor previews (Google Fonts' default weight)
+TTF = os.path.join(HERE, "IBMPlexMono-Regular.ttf")   # OFL - tools/IBMPlexMono-OFL.txt
+FACE = "IBM Plex Mono"
+WEIGHT = None  # static Regular TTF - no weight axis (the synthwave design, editor 2026-09-25)
+# Previous faces, kept in tools/ - set TTF/FACE/WEIGHT back to switch:
+# TTF, FACE, WEIGHT = os.path.join(HERE, "RobotoMono-VariableFont_wght.ttf"), "Roboto Mono", 400
 # TTF, FACE, WEIGHT = os.path.join(HERE, "ChivoMono-VariableFont_wght.ttf"), "Chivo Mono", 500
 DIGITS = "0123456789"
 UPPER = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -31,8 +35,8 @@ SYM = " :%/.-°,+'()!?&#"
 
 # (out_base, size, glyphs, atlas_w, stroke)
 FONTS = [
-    ("cg_time",   139, DIGITS,               512, 0),   # stacked HH / MM
-    ("cg_time_o", 139, DIGITS,               512, 2),   # always-on OUTLINE time: 2 px, anti-aliased (Iron Grit weight)
+    ("cg_time",   153, DIGITS,               512, 0),   # stacked HH / MM
+    ("cg_time_o", 153, DIGITS,               512, 2),   # always-on OUTLINE time: 2 px, anti-aliased (Iron Grit weight)
     ("cg_big",     36, DIGITS + UPPER + SYM, 512, 0),   # ring values, brand text, date
     ("cg_med",     30, DIGITS + UPPER + SYM, 512, 0),   # chip values, alt-tz, seconds value
     ("cg_week",    27, UPPER,                256, 0),   # weekday strip letters
@@ -129,6 +133,7 @@ generate(ICON_TTF, os.path.join(OUT, "cg_icon"), 24, "".join([chr(c) for c in IC
 # line box, and where the digit ink sits inside it depends on the typeface (Chivo Mono: centred;
 # Roboto Mono: 4 px low). The editor centres the digit ink too, so both agree for any font.
 import re as _re
+_TIME_PX = [f[1] for f in FONTS if f[0] == "cg_time"][0]
 _fnt = open(os.path.join(OUT, "cg_time.fnt"), encoding="utf-8").read().splitlines()
 _lh = int(_re.search(r"lineHeight=(\d+)", [l for l in _fnt if l.startswith("common")][0]).group(1))
 _rows = [dict(kv.split("=") for kv in l.split()[1:]) for l in _fnt if l.startswith("char ")]
@@ -141,7 +146,7 @@ with open(os.path.join(HERE, "..", "source", "TimeInk.mc"), "w", encoding="utf-8
             "// Screen px the cg_time digit INK centre sits below a TEXT_JUSTIFY_VCENTER anchor\n"
             "// (%s %d px: ink rows %d-%d in a %d px line box, +1 for CIQ's glyph row offset).\n"
             "// The view subtracts it so the time's y is the centre of the digits themselves.\n"
-            "module TimeInk {\n    const DY = %d;\n}\n" % (FACE, 139, _top, _bot, _lh, _dy))
+            "module TimeInk {\n    const DY = %d;\n}\n" % (FACE, _TIME_PX, _top, _bot, _lh, _dy))
 print("time ink offset: DY=%d (ink %d-%d, lineHeight %d)" % (_dy, _top, _bot, _lh))
 
 # --- sanity: every atlas must carry ink (a blank atlas silently kills all text) ----------

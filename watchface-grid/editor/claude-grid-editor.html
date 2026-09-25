@@ -148,25 +148,25 @@ function valueOf(e,c){ return c ? (c.tz ? tzTime(e.city) : c.v) : ""; }
 const SEC_IDX=21;
 // Defaults = the face as built (2026-09-25): Roboto Mono, teal VFD, the layout pasted from this
 // editor. Arc radius 224 = the face's (screen radius 227 - 3); the old 228 ran past the screen edge.
-function defaults(){return {font:"Roboto Mono",accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#ffffff",grad1:"#b4eede",grad2:"#1ec693",
-  hourGlow:"#1ec693",minGlow:"#1ec693",   // VFD glow colours (build_glow_digits.py --hour-glow / --minute-glow)
-  vfd:true, theme:"grid-teal",
-  arc:{span:65,dashW:10,dashLen:15,frac:0.5,rad:224},
+function defaults(){return {font:"IBM Plex Mono",accent:"#fede5d",text1:"#36f9f6",text2:"#ffffff",text3:"#848bbd",hourCol:"#ffffff",grad1:"#ff7edb",grad2:"#f97e72",
+  hourGlow:"#ff7edb",minGlow:"#fc28a8",   // VFD glow colours (build_glow_digits.py --hour-glow / --minute-glow)
+  vfd:true, theme:"synthwave",
+  arc:{span:65,dashW:10,dashLen:15,frac:0.5,rad:227},
   el:{
   batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:24,num:24,sym:24},
-  d02:{name:"Data 02 (upper-left)",kind:"chip",x:0.166,y:0.299,comp:7,num:30,sym:24},
-  d03:{name:"Data 03 (upper-right)",kind:"chip",x:0.834,y:0.299,comp:1,num:30,sym:24},
-  d04:{name:"Data 04 (left ring)",kind:"ring",x:0.135,y:0.498,comp:22,ring:56,num:36,sym:24,frac:0.53},
-  d05:{name:"Data 05 (right ring)",kind:"ring",x:0.865,y:0.498,comp:23,ring:56,num:36,sym:24,frac:0.72},
-  d06:{name:"Data 06 (lower-left)",kind:"chip",x:0.166,y:0.724,comp:17,num:30,sym:24},
-  d08:{name:"Data 08 (lower-right)",kind:"chip",x:0.834,y:0.724,comp:25,num:30,sym:24,city:"New York"},
+  d02:{name:"Data 02 (upper-left)",kind:"chip",x:0.175,y:0.299,comp:7,num:30,sym:24},
+  d03:{name:"Data 03 (upper-right)",kind:"chip",x:0.825,y:0.299,comp:1,num:30,sym:24},
+  d04:{name:"Data 04 (left ring)",kind:"ring",x:0.139,y:0.500,comp:22,ring:56,num:36,sym:24,frac:0.53},
+  d05:{name:"Data 05 (right ring)",kind:"ring",x:0.861,y:0.500,comp:23,ring:56,num:36,sym:24,frac:0.72},
+  d06:{name:"Data 06 (lower-left)",kind:"chip",x:0.177,y:0.722,comp:17,num:30,sym:24},
+  d08:{name:"Data 08 (lower-right)",kind:"chip",x:0.823,y:0.722,comp:25,num:30,sym:24,city:"New York"},
   sec:{name:"Data 07 (seconds dial)",kind:"tick",x:0.500,y:0.832,comp:SEC_IDX,ring:50,num:30,sym:24,frac:0.63,tick:"2px",knock:5},
-  time:{name:"Time",kind:"time",x:0.500,y:0.481,gap:56,num:139,fade:0.44},
+  time:{name:"Time",kind:"time",x:0.500,y:0.477,gap:59,num:153,fade:0.44},
   brand:{name:"Brand text",kind:"brand",x:0.500,y:0.169,num:36,text:"TACTIX"},
   alarmi:{name:"Alarm indicator",kind:"ind",x:0.166,y:0.169,sym:22,ic:0xea04},
   swatch:{name:"Stopwatch indicator",kind:"ind",x:0.834,y:0.169,sym:22,ic:0xff9b},
   date:{name:"Date",kind:"date",x:0.500,y:0.832,num:37,gap:90},
-  week:{name:"Week",kind:"week",x:0.500,y:0.980,num:27,span:52},
+  week:{name:"Week",kind:"week",x:0.500,y:0.971,num:27,span:52},
 }};}
 let P=defaults(), sel=null, guide=null, boxes={}, lowPower=false;
 const PAIR={d02:"d03",d03:"d02",d04:"d05",d05:"d04",d06:"d08",d08:"d06"};
@@ -391,7 +391,7 @@ bindR("adlR","adlRV",0,v=>{P.arc.dashLen=v;});
 // gradient/rings/glows = a pair of the theme's accents, accent = its vivid highlight.
 // The watch background stays black (AMOLED) in every theme.
 const THEMES=[
- ["grid-teal","Claude Grid teal (current face)",{accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#ffffff",grad1:"#b4eede",grad2:"#1ec693",hourGlow:"#1ec693",minGlow:"#1ec693"}],
+ ["grid-teal","Claude Grid teal",{accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#ffffff",grad1:"#b4eede",grad2:"#1ec693",hourGlow:"#1ec693",minGlow:"#1ec693"}],
  ["claude","Claude",{accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",hourGlow:"#ffc4a4",minGlow:"#ff6e46"}],
  ["iv22","IV-22 (VFD teal)",{accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#a4f5e1",grad1:"#5fe3bd",grad2:"#1ec693",hourGlow:"#1ec693",minGlow:"#1ec693"}],
  ["github-dark","GitHub Dark",{accent:"#f78166",text1:"#79c0ff",text2:"#e6edf3",text3:"#8b949e",hourCol:"#e6edf3",grad1:"#58a6ff",grad2:"#bc8cff",hourGlow:"#a5d6ff",minGlow:"#58a6ff"}],
@@ -401,7 +401,7 @@ const THEMES=[
  ["nord","Nord",{accent:"#d08770",text1:"#88c0d0",text2:"#eceff4",text3:"#7b88a1",hourCol:"#eceff4",grad1:"#8fbcbb",grad2:"#5e81ac",hourGlow:"#88c0d0",minGlow:"#81a1c1"}],
  ["tokyo-night","Tokyo Night",{accent:"#ff9e64",text1:"#7aa2f7",text2:"#c0caf5",text3:"#737aa2",hourCol:"#c0caf5",grad1:"#7dcfff",grad2:"#bb9af7",hourGlow:"#7aa2f7",minGlow:"#bb9af7"}],
  ["solarized","Solarized",{accent:"#cb4b16",text1:"#b58900",text2:"#eee8d5",text3:"#839496",hourCol:"#fdf6e3",grad1:"#2aa198",grad2:"#268bd2",hourGlow:"#93a1a1",minGlow:"#2aa198"}],
- ["synthwave","Synthwave",{accent:"#fede5d",text1:"#36f9f6",text2:"#ffffff",text3:"#848bbd",hourCol:"#ffffff",grad1:"#ff7edb",grad2:"#f97e72",hourGlow:"#ff7edb",minGlow:"#fc28a8"}],
+ ["synthwave","Synthwave (current face)",{accent:"#fede5d",text1:"#36f9f6",text2:"#ffffff",text3:"#848bbd",hourCol:"#ffffff",grad1:"#ff7edb",grad2:"#f97e72",hourGlow:"#ff7edb",minGlow:"#fc28a8"}],
  ["night-owl","Night Owl",{accent:"#f78c6c",text1:"#82aaff",text2:"#d6deeb",text3:"#7f9c9c",hourCol:"#d6deeb",grad1:"#7fdbca",grad2:"#c792ea",hourGlow:"#82aaff",minGlow:"#7fdbca"}],
 ];
 const themeSel=document.getElementById("themeSel");
@@ -460,6 +460,6 @@ linkAllColours();
 // Start in the face's own style. Only reset() used to copy P.vfd into the checkbox, so the page
 // opened with VFD unticked - draw() reads the checkbox, turned P.vfd off, and the Hour / Minute
 // glow pickers silently did nothing (the glow is only drawn in VFD style).
-document.getElementById("vfd").checked=P.vfd;
+document.getElementById("vfd").checked=P.vfd; themeSel.value=P.theme;   // the theme had the same load-time gap
 document.getElementById("fontSel").value=P.font; syncPanel(); setFont(P.font); setTimeout(prefetchFonts,1500);
 </script></body></html>

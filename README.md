@@ -103,7 +103,8 @@ is why the watch app must be installed (and opened once) for the faces to show C
   stock quotes (shown as the price, so it fits a corner).
 - **Data 08** shows a **second time zone** until you pick a complication for it; its city
   (15 choices, daylight saving automatic) is a face setting on the watch or in Garmin Connect.
-- The default look is a **teal VFD**: a glowing Roboto Mono time over a fine tube-style mesh,
+- The default look is a **synthwave VFD**: a glowing IBM Plex Mono time (white hour, pink-to-coral
+  minute, pink glow) with cyan data and a yellow accent, over a fine tube-style mesh,
   a pre-rasterised seconds dial and battery arc for crisp edges, and a thin outline time in
   always-on mode. The dial knocks a clean gap out of the minutes, Iron Grit style.
 
