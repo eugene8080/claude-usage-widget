@@ -96,6 +96,35 @@ class Storage private constructor(
             .apply()
     }
 
+    // ---- last watch push (plain, diagnostics for the phone app's status line) ----
+    //
+    // The push to the Garmin watch fails silently by design (it must never fail a widget
+    // refresh), which made "why is the watch stale?" unanswerable without a USB cable and
+    // logcat. Recording the last outcome lets the app itself answer it.
+
+    /** When the last push attempt finished, epoch ms; 0 when none has run. */
+    val watchPushAt: Long get() = snapshot.getLong("watch_push_at", 0L)
+
+    /** Whether that attempt reached a watch. */
+    val watchPushOk: Boolean get() = snapshot.getBoolean("watch_push_ok", false)
+
+    /** Human-readable outcome, e.g. "sent to tactix 8" or "failed (timeout)". */
+    val watchPushDetail: String get() = snapshot.getString("watch_push_detail", "").orEmpty()
+
+    /** When a push last actually reached a watch, epoch ms; 0 when never. */
+    val watchLastSentAt: Long get() = snapshot.getLong("watch_last_sent_at", 0L)
+
+    fun saveWatchPush(atEpochMs: Long, ok: Boolean, detail: String) {
+        val edit = snapshot.edit()
+            .putLong("watch_push_at", atEpochMs)
+            .putBoolean("watch_push_ok", ok)
+            .putString("watch_push_detail", detail)
+        if (ok) {
+            edit.putLong("watch_last_sent_at", atEpochMs)
+        }
+        edit.apply()
+    }
+
     companion object {
         @Volatile private var instance: Storage? = null
 

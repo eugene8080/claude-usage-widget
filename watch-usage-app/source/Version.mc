@@ -9,5 +9,5 @@ import Toybox.Lang;
 //! ships a new watch binary. Annotated (:glance) because the glance reads it.
 (:glance :background)
 module Version {
-    const APP = "1.9";
+    const APP = "1.10";
 }

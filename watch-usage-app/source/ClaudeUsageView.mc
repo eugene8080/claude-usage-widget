@@ -56,10 +56,14 @@ class ClaudeUsageView extends WatchUi.View {
                 Snapshot.percent(Snapshot.K_MODEL), Snapshot.resetAt(Snapshot.K_MODEL_RESET));
         }
 
-        if (Snapshot.isStale()) {
-            dc.setColor(STALE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, h * 0.83, Graphics.FONT_XTINY, "not updated recently",
-                Graphics.TEXT_JUSTIFY_CENTER);
+        // Always show the data's age - grey while fresh, amber once stale - so a watch that
+        // stopped receiving pushes is visible before the stale threshold, and how long it has
+        // been is readable without guessing.
+        var age = Snapshot.ageText();
+        if (!age.equals("")) {
+            dc.setColor(Snapshot.isStale() ? STALE : Graphics.COLOR_LT_GRAY,
+                Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, h * 0.83, Graphics.FONT_XTINY, age, Graphics.TEXT_JUSTIFY_CENTER);
         }
 
         // Version at the bottom, dim - the watch app's own, so a sideload can be confirmed.

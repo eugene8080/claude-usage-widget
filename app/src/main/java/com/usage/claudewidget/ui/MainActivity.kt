@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
+import android.text.format.DateUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +31,7 @@ import com.usage.claudewidget.auth.LoginActivity
 import com.usage.claudewidget.data.FetchResult
 import com.usage.claudewidget.data.Storage
 import com.usage.claudewidget.data.UsageRepository
+import com.usage.claudewidget.watch.WatchBridge
 import com.usage.claudewidget.widget.UsageWidget
 import kotlinx.coroutines.launch
 
@@ -55,6 +57,7 @@ private fun SetupScreen() {
 
     var status by remember { mutableStateOf(describe(storage)) }
     var debug by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
 
     val loginLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -80,24 +83,37 @@ private fun SetupScreen() {
             Text(if (storage.isLoggedIn) "Re-sign in" else "Sign in")
         }
 
-        OutlinedButton(onClick = {
+        // Runs the same fetch -> widget -> watch sequence as the background refresh, and shows
+        // each step's outcome. The watch step used to be skipped here, so a watch that was
+        // not receiving pushes looked fine from this button.
+        OutlinedButton(enabled = !busy, onClick = {
             scope.launch {
-                debug = "Fetching…"
-                debug = when (val r = UsageRepository(context).refresh()) {
-                    is FetchResult.Success -> {
-                        UsageWidget.updateAll(context)
-                        buildString {
-                            append("5H: ${r.snapshot.fiveHour.utilization}%   ")
-                            append("1W: ${r.snapshot.sevenDay.utilization}%")
-                            r.snapshot.modelWeekly?.let {
-                                append("   1W ${it.modelName}: ${it.window.utilization}%")
+                busy = true
+                try {
+                    debug = "Fetching…"
+                    when (val r = UsageRepository(context).refresh()) {
+                        is FetchResult.Success -> {
+                            UsageWidget.updateAll(context)
+                            val usage = buildString {
+                                append("5H: ${r.snapshot.fiveHour.utilization}%   ")
+                                append("1W: ${r.snapshot.sevenDay.utilization}%")
+                                r.snapshot.modelWeekly?.let {
+                                    append("   1W ${it.modelName}: ${it.window.utilization}%")
+                                }
                             }
+                            // The push can take up to ~35 s (one attempt, a 5 s pause, one
+                            // retry), so say what is happening rather than look frozen.
+                            debug = "$usage\nWatch: sending…"
+                            val push = WatchBridge.push(context, r.snapshot)
+                            debug = "$usage\nWatch: ${WatchBridge.describe(push)}"
                         }
+                        is FetchResult.NeedsLogin -> debug = "Session expired. Sign in again."
+                        is FetchResult.Soft -> debug = "Transient: ${r.reason}"
                     }
-                    is FetchResult.NeedsLogin -> "Session expired. Sign in again."
-                    is FetchResult.Soft -> "Transient: ${r.reason}"
+                } finally {
+                    busy = false
+                    status = describe(storage)
                 }
-                status = describe(storage)
             }
         }) { Text("Test fetch now") }
 
@@ -122,7 +138,23 @@ private fun describe(s: Storage): String = buildString {
                 .append(s.modelWeeklyUtil.toInt()).append("%")
         }
     }
+    // The watch's own "not updated recently" only says THAT it is stale; this line says why.
+    append("\nwatch: ")
+    if (s.watchPushAt == 0L) {
+        append("no push yet")
+    } else {
+        append(s.watchPushDetail).append(" · ").append(ago(s.watchPushAt))
+        if (!s.watchPushOk) {
+            append("\nlast reached watch: ")
+            append(if (s.watchLastSentAt == 0L) "never" else ago(s.watchLastSentAt))
+        }
+    }
 }
+
+/** "5 minutes ago" / "Yesterday" - locale-aware and needs no Context. */
+private fun ago(epochMs: Long): String = DateUtils.getRelativeTimeSpanString(
+    epochMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS
+).toString()
 
 private fun requestBatteryExemption(context: Context) {
     val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
