@@ -3,17 +3,18 @@
 A terminal/CLI-styled watch face for fenix 8 class watches (incl. tactix 8), modelled on the
 "Agentic Pro" look. Shows a prompt line, the time, the date, and the three Claude usage meters
 (5H / 1W / model) as CLI rows with bars, percentages, and reset times, plus a segmented battery
-bar (the straight counterpart of Claude Grid's battery arc), in IBM Plex Mono on the Night Owl
-palette, with a glowing VFD time. In always-on (low power) the time becomes a 2 px outline HH:MM
+bar (the straight counterpart of Claude Grid's battery arc), in IBM Plex Mono - by default in the
+Retro tube theme with scanlines (Night Owl is the alternative), with a glowing VFD time. In always-on (low power) the time becomes a 2 px outline HH:MM
 (`stm_time_o`, from `tools/build_fonts_terminal.py`), the seconds and grey tracks go and the VFD mesh
 (or scanlines) stays, much as
 on Claude Grid.
 
 A weather line sits at the top (condition icon + temperature, from `Toybox.Weather`; the icons
 are Claude Grid's `cg_icon`, copied as `stm_icon` by `tools/build_fonts_terminal.py`). Garmin
-Connect settings add a **colour theme** - Night Owl or **Retro tube** (green phosphor on a dark
-green background; its own glow digit set, `rt*`, from `tools/build_glow_time.py`) - and
-**Scanlines**, which swaps the VFD mesh for horizontal CRT lines (`scan_tile`). Always-on stays
+Connect settings add a **colour theme** - **Retro tube** by default (green phosphor on a dark
+green background, 80 %+ bars in the brightest green #11ff00; its own glow digit set, `rt*`, from
+`tools/build_glow_time.py`) or Night Owl - and **Scanlines** (on by default), which swaps the VFD
+mesh for horizontal CRT lines (`scan_tile`). Always-on stays
 black in every theme, with the mesh / scanlines still over it.
 
 In Retro tube *everything* glows. CIQ can't blur, so the text, the prompt and the weather icon

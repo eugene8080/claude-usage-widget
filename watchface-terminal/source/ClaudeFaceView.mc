@@ -73,8 +73,8 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private var _subscribed as Boolean = false;
     private var _showSeconds as Boolean = true;
     private var _prompt as String = DEFAULT_PROMPT;   // PromptText setting (Garmin Connect / editor)
-    private var _theme as Number = 0;                 // Theme setting: 0 Night Owl, 1 Retro tube
-    private var _scanlines as Boolean = false;        // Scanlines setting: CRT lines instead of mesh
+    private var _theme as Number = 1;                 // Theme setting: 0 Night Owl, 1 Retro tube (default)
+    private var _scanlines as Boolean = true;         // Scanlines setting: CRT lines instead of mesh (default on)
     private var _fontIcon as Graphics.FontType?;      // weather icons (stm_icon, from Claude Grid)
     // Halo twins of the prompt / date+rows / icon fonts (Retro tube: everything glows).
     private var _glowText as Graphics.FontType?;
@@ -145,19 +145,20 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var p = Application.Properties.getValue("PromptText");
         _prompt = (p instanceof String) ? p as String : DEFAULT_PROMPT;
         var t = Application.Properties.getValue("Theme");
-        _theme = (t instanceof Number) ? t : 0;
+        _theme = (t instanceof Number) ? t : THEME_RETRO;
         var s = Application.Properties.getValue("Scanlines");
-        _scanlines = (s instanceof Boolean) ? s : false;
+        _scanlines = (s instanceof Boolean) ? s : true;
         applyTheme(_theme);
     }
 
     //! Set the palette for a theme (layout editor values) and switch the glow digit set to match.
-    //! Retro tube: green phosphor on a near-black green background, amber for 80 %+ (a mono-
-    //! chrome tube has no red; amber still reads as "warning" against the greens).
+    //! Retro tube (the default): green phosphor on a near-black green background; 80 %+ bars in
+    //! the brightest pure green (#11FF00), so a near-cap meter flares rather than changing hue -
+    //! a monochrome tube has no red (the editor design, 2026-09-25; was amber).
     private function applyTheme(theme as Number) as Void {
         if (theme == THEME_RETRO) {
             ACCENT = 0x2BDC63; VALUE = 0x66FF8F; DIM = 0x1E9A48;
-            TRACK = 0x0C3318; NEAR_CAP = 0xFFB000; BG = 0x020F06;
+            TRACK = 0x0C3318; NEAR_CAP = 0x11FF00; BG = 0x020F06;
         } else {
             ACCENT = 0x82AAFF; VALUE = 0xD6DEEB; DIM = 0x7F9C9C;
             TRACK = 0x333333; NEAR_CAP = 0xEF5350; BG = 0x000000;

@@ -116,13 +116,14 @@ const THEMES=[
  ["synthwave","Synthwave",{bg:"#000000",accent:"#ff7edb",val:"#ffffff",dim:"#848bbd",track:"#333333",cap:"#fe4450",glow:"#ff7edb"}],
  ["night-owl","Night Owl",{bg:"#000000",accent:"#82aaff",val:"#d6deeb",dim:"#7f9c9c",track:"#333333",cap:"#ef5350",glow:"#82aaff"}],
  // Green-phosphor CRT (the watch's "Retro tube" theme - keep in step with ClaudeFaceView.applyTheme
- // and build_glow_time.THEMES). Near-black green background; amber for 80%+ (a mono tube has no red).
- ["retro-tube","Retro tube (green phosphor)",{bg:"#020f06",accent:"#2bdc63",val:"#66ff8f",dim:"#1e9a48",track:"#0c3318",cap:"#ffb000",glow:"#2bff6a"}],
+ // and build_glow_time.THEMES). Near-black green background; 80%+ in the brightest green (a mono tube has no red).
+ ["retro-tube","Retro tube (green phosphor)",{bg:"#020f06",accent:"#2bdc63",val:"#66ff8f",dim:"#1e9a48",track:"#0c3318",cap:"#11ff00",glow:"#2bff6a"}],
 ];
 
 function defaults(){return {
-  font:"IBM Plex Mono", showSeconds:true, vfd:true, scanlines:false, tube:false, theme:"night-owl",
-  bg:"#000000", accent:"#82aaff", val:"#d6deeb", dim:"#7f9c9c", track:"#333333", cap:"#ef5350", glow:"#82aaff",
+  // Default = the face default: Retro tube + scanlines + tube glow (the editor design, 2026-09-25).
+  font:"IBM Plex Mono", showSeconds:true, vfd:true, scanlines:true, tube:true, theme:"retro-tube",
+  bg:"#020f06", accent:"#2bdc63", val:"#66ff8f", dim:"#1e9a48", track:"#0c3318", cap:"#11ff00", glow:"#2bff6a",
   el:{
     prompt:{name:"Prompt line", kind:"text", x:0.434, y:0.187, size:26, text:"fenix@tactix ~ $"},
     time:  {name:"Time",        kind:"time", x:0.500, y:0.234, size:70},

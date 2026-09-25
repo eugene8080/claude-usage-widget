@@ -15,9 +15,9 @@ class ClaudeFaceSettingsMenu extends WatchUi.Menu2 {
         Menu2.initialize({ :title => Rez.Strings.settingsTitle });
         addItem(new WatchUi.MenuItem(Rez.Strings.promptTextTitle, FaceSettings.readPrompt(), :prompt, null));
         addItem(new WatchUi.ToggleMenuItem(Rez.Strings.themeRetroToggle, Rez.Strings.themeRetroSub,
-            :retro, FaceSettings.readNumber("Theme", 0) == 1, null));
+            :retro, FaceSettings.readNumber("Theme", 1) == 1, null));
         addItem(new WatchUi.ToggleMenuItem(Rez.Strings.scanlinesTitle, null,
-            :scan, FaceSettings.readBool("Scanlines", false), null));
+            :scan, FaceSettings.readBool("Scanlines", true), null));
         addItem(new WatchUi.ToggleMenuItem(Rez.Strings.showSecondsTitle, null,
             :secs, FaceSettings.readBool("ShowSeconds", true), null));
     }
