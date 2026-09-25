@@ -33,10 +33,10 @@ class ClaudeFaceView extends WatchUi.WatchFace {
 
     // --- layout (fractions of the screen), from the editor ---
     // Prompt, time and date are centred on their x; every line is top-aligned at its y.
-    private const PROMPT_X = 0.436;  private const PROMPT_Y = 0.188;
-    private const TIME_X = 0.500;    private const TIME_Y = 0.247;
-    private const DATE_X = 0.313;    private const DATE_Y = 0.445;
-    private const ROWS_Y = 0.532;    private const ROWS_GAP = 0.113;
+    private const PROMPT_X = 0.434;  private const PROMPT_Y = 0.187;
+    private const TIME_X = 0.500;    private const TIME_Y = 0.234;
+    private const DATE_X = 0.313;    private const DATE_Y = 0.423;
+    private const ROWS_Y = 0.508;    private const ROWS_GAP = 0.113;
     private const LABEL_X = 0.148;   private const BAR_X = 0.242;   private const BAR_W = 0.287;
     private const BAR_H = 0.030;     private const BAR_DY = 0.018;
     private const PCT_X = 0.639;     private const RESET_X = 0.858;
@@ -52,6 +52,8 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private const BATT_SEGS = 16;
     private const BATT_SEG_W = 0.022; private const BATT_GAP = 0.011; private const BATT_H = 0.033;
     private const BATT_LOW = 20;     // at or below this %, the lit segments turn NEAR_CAP red
+    // Always-on meter bars are hollow, with the same 2 px stroke as the outline time.
+    private const AOD_STROKE = 2;
 
     // One cache slot per meter. pct is -1 until a value arrives; resetEpoch 0 means none.
     private var _labels as Array<String> = ["5H", "1W", "--"];
@@ -72,8 +74,9 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     // Always-on (low power), the same scheme as Claude Grid: onEnterSleep / onExitSleep flip it.
     // The AMOLED burn-in budget wants few, thin lit pixels, so while it is set the face draws
     // the time as HH:MM in the hollow outline font (no glow bitmaps, no seconds, no per-second
-    // repaint), drops the full-face mesh and every grey track (meter bar backgrounds, unlit
-    // battery segments), and keeps only the text and the filled bar/battery portions.
+    // repaint) left where the high-power HH:MM sits, drops the full-face mesh and every grey
+    // track (meter bar backgrounds, unlit battery segments), draws the meter bars' filled part as
+    // a 2 px hollow outline, and keeps the text and the lit battery segments.
     private var _lowPower as Boolean = false;
 
     public function initialize() {
@@ -318,11 +321,17 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var ty = px(h * TIME_Y);
         if (_lowPower) {
             // Always-on: HH:MM in the hollow outline font, never the glow bitmaps (a lit bloom
-            // would blow the AMOLED burn-in budget). Same top as the solid time - the outline
-            // font shares its line metrics - so the time doesn't jump on entering sleep.
+            // would blow the AMOLED burn-in budget). HH:MM must not MOVE on entering sleep -
+            // only the seconds disappear - so it keeps the left edge the high-power time has:
+            // centred on the width of the whole HH:MM:SS (both paths centre on that, see
+            // GlowTime.draw / text()). The outline font shares the solid font's line metrics
+            // and advance (monospace), so each digit lands exactly on its solid twin.
+            var solid = timeFont();
+            var full = _showSeconds ? t + ":00" : t;   // same width as any HH:MM:SS (monospace)
+            var left = px(w * TIME_X) - dc.getTextWidthInPixels(full, solid) / 2;
             dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
-            text(dc, w * TIME_X, ty, (_fontTimeO != null) ? _fontTimeO : timeFont(), t,
-                Graphics.TEXT_JUSTIFY_CENTER);
+            dc.drawText(left, ty, (_fontTimeO != null) ? _fontTimeO : solid, t,
+                Graphics.TEXT_JUSTIFY_LEFT);
             return;
         }
         if (_showSeconds) {
@@ -423,7 +432,11 @@ class ClaudeFaceView extends WatchUi.WatchFace {
             var fw = px(bw * clamped / 100.0);
             if (fw > 0) {
                 dc.setColor(pct >= 80 ? NEAR_CAP : ACCENT, Graphics.COLOR_TRANSPARENT);
-                dc.fillRectangle(bx, by, fw, bh);
+                if (_lowPower) {
+                    outlineRect(dc, bx, by, fw, bh, AOD_STROKE);   // always-on: hollow bar
+                } else {
+                    dc.fillRectangle(bx, by, fw, bh);
+                }
             }
         }
 
@@ -439,6 +452,21 @@ class ClaudeFaceView extends WatchUi.WatchFace {
             text(dc, w * RESET_X, y, fs(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
         }
     }
+    //! A hollow rectangle: a `t`-px border drawn INSIDE (x, y, w, h), all edges on whole pixels.
+    //! Four fills rather than drawRectangle so the stroke width is exact and nothing is
+    //! anti-aliased. Too small to leave a hollow (e.g. a 1 % bar) -> filled solid instead.
+    private function outlineRect(dc as Dc, x as Number, y as Number, w as Number, h as Number,
+                                 t as Number) as Void {
+        if (w <= 2 * t || h <= 2 * t) {
+            dc.fillRectangle(x, y, w, h);
+            return;
+        }
+        dc.fillRectangle(x, y, w, t);                   // top
+        dc.fillRectangle(x, y + h - t, w, t);           // bottom
+        dc.fillRectangle(x, y + t, t, h - 2 * t);       // left
+        dc.fillRectangle(x + w - t, y + t, t, h - 2 * t); // right
+    }
+
     //! The watch battery as a straight row of segments - every edge on a whole pixel (integer
     //! segment width, gap and origin), so the segments are as crisp as the meter bars. A segment
     //! lights as soon as its share has started (ceil), so any charge left shows at least one;
