@@ -25,7 +25,9 @@ FACE = "IBM Plex Mono"
 WEIGHT = None       # static font; set a number (e.g. 400) for a variable TTF's weight axis
 
 TIME_CHARS = "0123456789:"
-TEXT_CHARS = "".join([chr(c) for c in range(0x20, 0x7F)])  # printable ASCII
+# Printable ASCII + the degree sign for the weather temperature ("17°") - without it the
+# temperature ended in a tofu box.
+TEXT_CHARS = "".join([chr(c) for c in range(0x20, 0x7F)]) + "°"
 
 
 def generate(out_base: str, size: int, chars: str, atlas_w: int = 256) -> None:
@@ -103,7 +105,23 @@ def generate_outline(out_base: str, size: int, chars: str, stroke: int = 2,
         raise SystemExit("!!! %s is blank - a blank atlas silently kills all text" % out_base)
 
 
+def copy_icon_font() -> None:
+    """The weather icons, as stm_icon: Claude Grid's generated cg_icon atlas (Tabler icons at
+    24 px, incl. the composited cloud+sun / cloud+moon at 0xE001 / 0xE002), copied rather than
+    regenerated so both faces show identical icons from one source. Run watchface-grid's
+    tools/build_fonts_grid.py first if the icon set changes."""
+    src = os.path.join(HERE, "..", "..", "watchface-grid", "resources", "fonts")
+    fnt = open(os.path.join(src, "cg_icon.fnt"), encoding="utf-8").read()
+    if 'file="cg_icon_0.png"' not in fnt:
+        raise SystemExit("cg_icon.fnt page line changed - update copy_icon_font()")
+    with open(os.path.join(OUT, "stm_icon.fnt"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(fnt.replace('file="cg_icon_0.png"', 'file="stm_icon_0.png"'))
+    Image.open(os.path.join(src, "cg_icon_0.png")).save(os.path.join(OUT, "stm_icon_0.png"))
+    print("copied cg_icon -> stm_icon (weather icons)")
+
+
 if __name__ == "__main__":
+    copy_icon_font()
     generate(os.path.join(OUT, "stm_time"), 70, TIME_CHARS, 256)    # editor: time size
     # always-on time: 2 px outline (Claude Grid's cg_time_o weight), digits + colon only
     generate_outline(os.path.join(OUT, "stm_time_o"), 70, TIME_CHARS, 2)

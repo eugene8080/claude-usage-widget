@@ -4,4 +4,9 @@
     <!-- The prompt line's text. Default = the layout editor's Prompt text; editable in Garmin
          Connect (settings.xml) without rebuilding the face. -->
     <property id="PromptText" type="string">eugene@tactix ~ $</property>
+    <!-- Colour theme: 0 = Night Owl, 1 = Retro tube (green phosphor). Each has its own glow
+         time digits (tools/build_glow_time.py THEMES). -->
+    <property id="Theme" type="number">0</property>
+    <!-- Old-monitor scanlines: thin horizontal lines over the face instead of the VFD mesh. -->
+    <property id="Scanlines" type="boolean">false</property>
 </properties>

@@ -2,4 +2,8 @@
     <string id="AppName">Claude Terminal</string>
     <string id="showSecondsTitle">Show seconds</string>
     <string id="promptTextTitle">Prompt text (top line)</string>
+    <string id="themeTitle">Colour theme</string>
+    <string id="themeNightOwl">Night Owl</string>
+    <string id="themeRetroTube">Retro tube (green)</string>
+    <string id="scanlinesTitle">Scanlines (old monitor)</string>
 </strings>

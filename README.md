@@ -115,8 +115,12 @@ is why the watch app must be installed (and opened once) for the faces to show C
   palette.
 - A segmented **battery bar** under the meters — Claude Grid's top battery arc, straightened (turns
   red at 20%).
-- Settings (Garmin Connect): **Show seconds** (on by default), and the **prompt text** — make the
-  top line say whatever you like.
+- **Weather** at the top, like Rad Lad: the current condition icon (sun / moon by time of day) and
+  the temperature in the watch's units.
+- Settings (Garmin Connect): **Show seconds** (on by default), the **prompt text** — make the top
+  line say whatever you like — a **colour theme** (**Night Owl**, or **Retro tube**: green phosphor
+  on a dark-green screen, Pip-Boy style), and **Scanlines** (thin horizontal lines like an old
+  monitor, in place of the VFD mesh).
 - VFD style by default (glowing time + full-face mesh).
 - Always-on (low power), like Claude Grid: the time becomes a thin outline **HH:MM** that stays
   exactly where it was (only the seconds drop), the three Claude bars become outlines, and the

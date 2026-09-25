@@ -8,6 +8,13 @@ palette, with a glowing VFD time. In always-on (low power) the time becomes a 2 
 (`stm_time_o`, from `tools/build_fonts_terminal.py`) and the mesh, seconds and grey tracks go, as
 on Claude Grid.
 
+A weather line sits at the top (condition icon + temperature, from `Toybox.Weather`; the icons
+are Claude Grid's `cg_icon`, copied as `stm_icon` by `tools/build_fonts_terminal.py`). Garmin
+Connect settings add a **colour theme** - Night Owl or **Retro tube** (green phosphor on a dark
+green background; its own glow digit set, `rt*`, from `tools/build_glow_time.py`) - and
+**Scanlines**, which swaps the VFD mesh for horizontal CRT lines (`scan_tile`). Always-on stays
+black with no overlay in every theme.
+
 Updated: 2026-09-25
 
 ## Where the data comes from

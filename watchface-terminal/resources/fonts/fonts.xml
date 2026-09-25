@@ -9,4 +9,6 @@
     <font id="STMonoSmall" antialias="true" filename="stm_small.fnt" />
     <font id="STMonoTime"  antialias="true" filename="stm_time.fnt" />
     <font id="STMonoTimeOutline" antialias="true" filename="stm_time_o.fnt" />
+    <!-- Weather icons (Tabler, 24 px): copied from Claude Grid's cg_icon by the same script. -->
+    <font id="STIcon" antialias="true" filename="stm_icon.fnt" />
 </fonts>

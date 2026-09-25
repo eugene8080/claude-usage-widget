@@ -11,8 +11,38 @@ import Toybox.WatchUi;
 module GlowTime {
 
     var _bmps as Array = new [11];   // 0-9 = digits, 10 = colon; loaded on first use
+    var _theme as Number = 0;        // 0 = Night Owl (GT*), 1 = Retro tube (RT*)
+
+    //! Switch digit sets (the "Theme" setting). Drops the cached bitmaps so only the active
+    //! set is ever held in the graphics pool.
+    function setTheme(theme as Number) as Void {
+        if (theme != _theme) {
+            _theme = theme;
+            _bmps = new [11];
+        }
+    }
 
     function resId(i as Number) as ResourceId {
+        return (_theme == 1) ? retroId(i) : nightOwlId(i);
+    }
+
+    function retroId(i as Number) as ResourceId {
+        switch (i) {
+            case 0: return Rez.Drawables.RT0;
+            case 1: return Rez.Drawables.RT1;
+            case 2: return Rez.Drawables.RT2;
+            case 3: return Rez.Drawables.RT3;
+            case 4: return Rez.Drawables.RT4;
+            case 5: return Rez.Drawables.RT5;
+            case 6: return Rez.Drawables.RT6;
+            case 7: return Rez.Drawables.RT7;
+            case 8: return Rez.Drawables.RT8;
+            case 9: return Rez.Drawables.RT9;
+            default: return Rez.Drawables.RTC;
+        }
+    }
+
+    function nightOwlId(i as Number) as ResourceId {
         switch (i) {
             case 0: return Rez.Drawables.GT0;
             case 1: return Rez.Drawables.GT1;
