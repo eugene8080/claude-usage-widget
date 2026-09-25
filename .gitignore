@@ -27,3 +27,6 @@ watchface-grid/dist/
 
 # Python tooling cache (font generators)
 __pycache__/
+
+# Kotlin compiler session cache (created by Gradle builds)
+.kotlin/

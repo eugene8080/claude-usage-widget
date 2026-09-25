@@ -2,8 +2,8 @@
 
 # ✳️ Claude Usage Widget
 
-**An Android home-screen widget for your Claude subscription usage.**
-Keeps your `5H`, `1W` and `1W Fable` percentages (plus *“resets in”* countdowns) live on your home screen.
+**An Android home-screen widget for your Claude subscription usage — plus a Garmin watch app and two watch faces.**
+Keeps your `5H`, `1W` and `1W Fable` percentages (plus *“resets in”* countdowns) live on your home screen and on your wrist.
 
 ![status: working](https://img.shields.io/badge/status-working-brightgreen)
 ![platform: Android 8+](https://img.shields.io/badge/platform-Android%208%2B-3DDC84?logo=android&logoColor=white)
@@ -56,6 +56,71 @@ Then continue with first-run setup below.
 
 - A Claude **Pro/Max** subscription (this reads consumer subscription usage, not API-key usage).
 - **Android 8.0 (API 26)** or newer. Built and tested on a Pixel 9 / Android 16.
+
+---
+
+## ⌚ On your Garmin watch
+
+<sub>Updated: 2026-09-25 · Built and tested on a tactix 8 (the `fenix847mm` Connect IQ profile); also builds for fēnix 8 43 mm, fēnix 8 Pro 47 mm and fēnix 8 Solar 47 / 51 mm.</sub>
+
+Three Connect IQ projects put the same usage numbers on a fēnix 8 / tactix 8 class watch:
+
+| Project | What it is |
+| --- | --- |
+| [`watch-usage-app/`](watch-usage-app/README.md) | **Claude Usage** — a glance showing the `5H` / `1W` / per-model meters with their reset times, and the **publisher**: it receives the numbers from the phone and republishes them as three watch **complications** that faces can show. |
+| [`watchface-grid/`](watchface-grid/editor/README.md) | **Claude Grid** — an Iron Grit–style data face: a big stacked time, battery arc, seconds dial and **seven editable data fields** that take *any* complication. |
+| [`watchface-terminal/`](watchface-terminal/README.md) | **Claude Terminal** — a CLI-styled face: a prompt line, the time, the date and the three Claude meters as terminal rows with bars, percentages and reset times. |
+
+**How the numbers get there.** The watch never talks to Claude (Cloudflare and credential safety
+both rule it out — see the watch-app README). The phone app pushes the percentages over Bluetooth
+to the **Claude Usage** watch app, which publishes them as complications every 5 minutes. A watch
+face can't receive phone pushes itself, so both faces **subscribe to those complications** — which
+is why the watch app must be installed (and opened once) for the faces to show Claude usage.
+
+### Claude Grid
+
+- **Seven data fields you set on the watch** with Garmin's own face editor (hold the face →
+  customise): the Claude meters, heart rate, body battery, weather, steps, sunrise/sunset,
+  respiration, VO2 max, training status… Every slot accepts *any* complication, including other
+  Connect IQ apps' — e.g. **[QuoteGlance](https://apps.garmin.com/en-US/apps/da6bba83-ce69-47cf-9353-85beba4bbe31)**
+  stock quotes (shown as the price, so it fits a corner).
+- **Data 08** shows a **second time zone** until you pick a complication for it; its city
+  (15 choices, daylight saving automatic) is a face setting on the watch or in Garmin Connect.
+- The default look is a **teal VFD**: a glowing Roboto Mono time over a fine tube-style mesh,
+  a pre-rasterised seconds dial and battery arc for crisp edges, and a thin outline time in
+  always-on mode. The dial knocks a clean gap out of the minutes, Iron Grit style.
+
+### Claude Terminal
+
+- The three Claude meters as CLI rows (`5H`, `1W`, model) with bars, percentages and absolute
+  reset times, under a `claude ~ %` prompt and the time.
+- Settings (Garmin Connect): **Show seconds**, and the **prompt text** — make the top line say
+  whatever you like.
+- An optional VFD build (glowing time + full-face mesh) — see its README.
+
+### Layout editors
+
+Each face has a self-contained HTML designer — open it in any browser:
+[`watchface-grid/editor/claude-grid-editor.html`](watchface-grid/editor/claude-grid-editor.html) and
+[`watchface-terminal/editor/claude-terminal-editor.html`](watchface-terminal/editor/claude-terminal-editor.html).
+Drag or arrow-key the elements, **Tab** between them, pick a **colour theme** (Claude, IV-22, Nord,
+Dracula, Tokyo Night and other VS Code themes) and a **font** (56, incl. dot-matrix faces like Doto),
+scrub a **preview time & date** to check for overlaps, and toggle the VFD look. Text is placed by the
+watch's own layout rule, so the preview matches the simulator. **Copy settings** produces a block that
+is built into the face.
+
+### Install on the watch
+
+Build a `.prg` (below), connect the watch by USB with its screen **awake and unlocked**, and drag the
+file into **`GARMIN/Apps`**. Install the watch app and whichever face(s) you want; pick the face from
+the watch's face list.
+
+```bash
+monkeyc -f watchface-grid/monkey.jungle -o ClaudeGrid.prg -y <developer_key.der> -d fenix847mm -r
+```
+
+Needs the Connect IQ SDK and a developer key; each project's README has the details (fonts, the
+VFD assets and the generators that make them).
 
 ---
 
