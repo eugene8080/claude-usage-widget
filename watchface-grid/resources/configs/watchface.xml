@@ -18,7 +18,8 @@
             <complication id="8" allowAny="true"/>  <!-- Data 08: lower-right, default temperature  -->
         </data>
         <dataColors>
-            <color label="@Strings.colTeal" default="true">0x1EC693</color>
+            <color label="@Strings.colCyan" default="true">0x36F9F6</color>
+            <color label="@Strings.colTeal">0x1EC693</color>
             <color label="@Strings.colPeach">0xFFA480</color>
             <color label="@Strings.colWhite">0xFFFFFF</color>
             <color label="@Strings.colOrange">0xE95625</color>

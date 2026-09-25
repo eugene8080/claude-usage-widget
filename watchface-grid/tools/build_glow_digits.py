@@ -62,22 +62,24 @@ PAD = 18  # bloom margin on every side; the wide glow (sigma 7) is < 1% alpha by
 Y_CALIBRATION = 1
 
 # Palette - must stay in lock-step with ClaudeGridView.HOUR_COL and GridDraw.GRAD_A / GRAD_B.
-# Teal VFD palette from the layout editor, 2026-09-25 (the Claude orange set is the editor's
-# "Claude" theme: GRAD ff9255 -> ff3c3b, hour glow ffc4a4, minute glow = follow the gradient).
+# Synthwave palette from the layout editor, 2026-09-25. Earlier palettes: the teal VFD set
+# (hour glow / minute glow / GRAD_B 1ec693, GRAD_A b4eede, HOUR_BOT e2f4ee) and the editor's
+# "Claude" theme (GRAD ff9255 -> ff3c3b, hour glow ffc4a4, minute glow = follow the gradient).
 HOUR_TOP = (255, 255, 255)
-HOUR_BOT = (226, 244, 238)       # faint teal fall-off so the white hour has some depth
-HOUR_GLOW = (0x1E, 0xC6, 0x93)   # IV-22 teal bloom (editor "Hour glow"; Claude theme: ffc4a4)
-# Minute bloom: None = each row glows in its own gradient colour (orange above, red below); a
-# fixed (r, g, b) overrides it. Both are settable with --hour-glow / --minute-glow (hex), which is
-# what the layout editor's "Hour glow" / "Minute glow" pickers map to.
-MINUTE_GLOW = (0x1E, 0xC6, 0x93) # editor "Minute glow" (None = follow the minute gradient)
-GRAD_A = (0xB4, 0xEE, 0xDE)      # Gradient 1 (pale teal)  - top of the minute
-GRAD_B = (0x1E, 0xC6, 0x93)      # Gradient 2 (IV-22 teal) - bottom of the minute
+HOUR_BOT = (255, 236, 250)       # faint pink fall-off (12 % of the hour glow) so the white hour has depth
+HOUR_GLOW = (0xFF, 0x7E, 0xDB)   # synthwave pink bloom (editor "Hour glow")
+# Minute bloom: None = each row glows in its own gradient colour; a fixed (r, g, b) overrides
+# it. Both are settable with --hour-glow / --minute-glow (hex), which is what the layout
+# editor's "Hour glow" / "Minute glow" pickers map to.
+MINUTE_GLOW = (0xFC, 0x28, 0xA8) # hot magenta bloom (editor "Minute glow")
+GRAD_A = (0xFF, 0x7E, 0xDB)      # Gradient 1 (pink)  - top of the minute
+GRAD_B = (0xF9, 0x7E, 0x72)      # Gradient 2 (coral) - bottom of the minute
 
 # The font path's minute gradient (ClaudeGridView.drawGradientText): over yc +/- HALF_H, solid
 # Gradient 1 for the top (0.5 - FADE/2), a linear blend across the middle FADE, solid Gradient 2
-# below. Reproduced here per pixel row instead of in 12 clip bands.
-GRAD_HALF_H = 58
+# below. Reproduced here per pixel row instead of in 12 clip bands. HALF_H = 0.42 x the time
+# size, as the editor draws it (153 px -> 64; it was 58 at 139 px) - keep in step with the view.
+GRAD_HALF_H = 64
 GRAD_FADE = 0.44
 
 

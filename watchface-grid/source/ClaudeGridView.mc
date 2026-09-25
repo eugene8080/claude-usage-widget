@@ -26,22 +26,25 @@ import Toybox.Weather;
 class ClaudeGridView extends WatchUi.WatchFace {
 
     // --- palette (from the layout editor) ---------------------------------------------------
-    // Teal VFD palette from the layout editor (2026-09-25, IV-22-based). The Claude orange original
-    // is the editor's "Claude" theme: TEXT2 FFFFFF, TEXT3 9A9A9A, accent FF531A, data FF9C75.
-    private const TEXT2 = 0x7FE8C8;               // ring values + date
-    private const TEXT3 = 0x13916B;               // icons, labels, weekday strip, brand, SEC
+    // Synthwave palette from the layout editor (2026-09-25). Earlier palettes are the editor's
+    // themes: "Claude Grid teal" (TEXT2 7FE8C8, TEXT3 13916B, accent A4F5E1, data 1EC693) and
+    // "Claude" (TEXT2 FFFFFF, TEXT3 9A9A9A, accent FF531A, data FF9C75).
+    private const TEXT2 = 0xFFFFFF;               // ring values + date
+    private const TEXT3 = 0x848BBD;               // icons, labels, weekday strip, brand, SEC
     private const HOUR_COL = 0xFFFFFF;            // hour digits (solid)
-    private const _DEFAULT_ACCENT = 0xA4F5E1;    // today's weekday + seconds value
-    private const _DEFAULT_DATA = 0x1EC693;      // chip values (Text 1)
+    private const _DEFAULT_ACCENT = 0xFEDE5D;    // today's weekday + seconds value
+    private const _DEFAULT_DATA = 0x36F9F6;      // chip values (Text 1)
 
-    private const TIME_GAP = 56;                 // HH / MM digit centres each this far from TIME_Y
-    private const TIME_Y = 0.481;                // time block centre (fraction of height), = editor
+    private const TIME_GAP = 59;                 // HH / MM digit centres each this far from TIME_Y
+    private const TIME_Y = 0.477;                // time block centre (fraction of height), = editor
+    private const TIME_HALF_H = 64;              // minute gradient half-height: 0.42 x the 153 px time
+                                                 // (= build_glow_digits.GRAD_HALF_H and the editor)
     private const DIAL_R = 50;                   // seconds-dial tick outer radius (= tick font R_OUT)
     private const DIAL_CLEAR_R = 55;             // knockout disc: DIAL_R + a 5 px black gap
     private const DATE_GAP = 90;                 // month / day each this far either side of the dial
 
-    private var _fTime as Graphics.FontType?;    // 139px digits  - the clock
-    private var _fTimeO as Graphics.FontType?;   // 139px outline - always-on clock
+    private var _fTime as Graphics.FontType?;    // 153px digits  - the clock
+    private var _fTimeO as Graphics.FontType?;   // 153px outline - always-on clock
     private var _fBig as Graphics.FontType?;     // 36px          - ring values, brand, date
     private var _fMed as Graphics.FontType?;     // 30px          - chip values, alt-tz, seconds
     private var _fWeek as Graphics.FontType?;    // 27px          - weekday letters
@@ -133,14 +136,14 @@ class ClaudeGridView extends WatchUi.WatchFace {
         // uid, kind, fx, fy, ringR, pen, horizontal, defaultType
         var specs = [
             [1, SlotKind.CHIP, 0.500, 0.092, 0,     0, true,  Complications.COMPLICATION_TYPE_BATTERY],
-            [2, SlotKind.CHIP, 0.166, 0.299, 0,     0, false, Complications.COMPLICATION_TYPE_HIGH_LOW_TEMPERATURE],
-            [3, SlotKind.CHIP, 0.834, 0.299, 0,     0, false, Complications.COMPLICATION_TYPE_STEPS],
-            [4, SlotKind.RING, 0.135, 0.498, ringR, 6, false, Complications.COMPLICATION_TYPE_HEART_RATE],
-            [5, SlotKind.RING, 0.865, 0.498, ringR, 6, false, Complications.COMPLICATION_TYPE_BODY_BATTERY],
-            [6, SlotKind.CHIP, 0.166, 0.724, 0,     0, false, Complications.COMPLICATION_TYPE_CURRENT_WEATHER],
+            [2, SlotKind.CHIP, 0.175, 0.299, 0,     0, false, Complications.COMPLICATION_TYPE_HIGH_LOW_TEMPERATURE],
+            [3, SlotKind.CHIP, 0.825, 0.299, 0,     0, false, Complications.COMPLICATION_TYPE_STEPS],
+            [4, SlotKind.RING, 0.139, 0.500, ringR, 6, false, Complications.COMPLICATION_TYPE_HEART_RATE],
+            [5, SlotKind.RING, 0.861, 0.500, ringR, 6, false, Complications.COMPLICATION_TYPE_BODY_BATTERY],
+            [6, SlotKind.CHIP, 0.177, 0.722, 0,     0, false, Complications.COMPLICATION_TYPE_CURRENT_WEATHER],
             // Data 08: NO seeded default - while nothing is picked it shows the time-zone clock
             // (see refreshAltTz). Same centre the fixed alt-tz field used, so the look is unchanged.
-            [8, SlotKind.CHIP, 0.834, 0.724, 0,     0, false, null]
+            [8, SlotKind.CHIP, 0.823, 0.722, 0,     0, false, null]
         ];
 
         _slots = [];
@@ -382,7 +385,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
 
         // Arc on the bezel: gauges Data 01's percentage (e.g. Claude Fable 55%), falling back to
         // the system battery when Data 01 isn't a 0-100 metric. Sweeps in with the rings on wake.
-        GridDraw.segmentArc(dc, cx, cy, cx - 3, 122.5, 57.5, 16, battArcFrac() * ringSweep, 10, 15, _fArc);
+        GridDraw.segmentArc(dc, cx, cy, cx, 122.5, 57.5, 16, battArcFrac() * ringSweep, 10, 15, _fArc);
 
         // The seven editable slots (skip the one the editor is currently pulsing). Data 08 is
         // re-filled with the time-zone clock first when that's what it should show.
@@ -413,7 +416,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
             drawSeconds(dc, cx, dialY, DIAL_R);
             drawDate(dc, cx, dialY);
         }
-        drawWeekCurved(dc, cx, cy, (h * 0.980).toNumber() - cy);
+        drawWeekCurved(dc, cx, cy, (h * 0.971).toNumber() - cy);
 
         // Full-face VFD mesh, LAST so it lies over every lit pixel (time, text, icons, rings, arc).
         // Skipped in always-on: the thin outline time + collapsed date would break up under it.
@@ -494,7 +497,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private function drawGradientText(dc as Dc, x as Numeric, yc as Numeric, font as Graphics.FontType,
                                       text as String, cTop as Number, cBot as Number) as Void {
         var halfW = (dc.getTextWidthInPixels(text, font) / 2) + 8;
-        var halfH = 58;
+        var halfH = TIME_HALF_H;
         var bands = 12;
         var lo = 0.5 - 0.44 / 2.0;
         var hi = 0.5 + 0.44 / 2.0;

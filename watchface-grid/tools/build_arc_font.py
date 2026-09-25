@@ -38,7 +38,7 @@ BASE = "cg_arc"
 
 SCREEN = 454
 CX = CY = SCREEN / 2.0        # pixel corner (227, 227)
-R_OUT = SCREEN / 2.0 - 3      # 224
+R_OUT = SCREEN / 2.0 - 0      # 227: dashes reach the screen edge (editor arc rad=227, synthwave design; was 224)
 DASH_LEN = 15
 DASH_W = 10
 N = 16
