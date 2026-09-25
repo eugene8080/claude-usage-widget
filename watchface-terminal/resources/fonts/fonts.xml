@@ -11,4 +11,10 @@
     <font id="STMonoTimeOutline" antialias="true" filename="stm_time_o.fnt" />
     <!-- Weather icons (Tabler, 24 px): copied from Claude Grid's cg_icon by the same script. -->
     <font id="STIcon" antialias="true" filename="stm_icon.fnt" />
+    <!-- Soft halo twins of the prompt, date/row and icon fonts (tools/build_fonts_terminal.py,
+         glow_from_bmfont): drawn under the sharp text in the Retro tube theme so everything
+         glows like a phosphor tube. Same line metrics and advances as their sources. -->
+    <font id="STMonoGlow"      antialias="true" filename="stm_text_glow.fnt" />
+    <font id="STMonoSmallGlow" antialias="true" filename="stm_small_glow.fnt" />
+    <font id="STIconGlow"      antialias="true" filename="stm_icon_glow.fnt" />
 </fonts>

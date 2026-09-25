@@ -15,6 +15,16 @@ green background; its own glow digit set, `rt*`, from `tools/build_glow_time.py`
 **Scanlines**, which swaps the VFD mesh for horizontal CRT lines (`scan_tile`). Always-on stays
 black with no overlay in every theme.
 
+In Retro tube *everything* glows. CIQ can't blur, so the text, the prompt and the weather icon
+each have a pre-rendered halo font (`*_glow`, `glow_from_bmfont` in `tools/build_fonts_terminal.py`)
+drawn under the sharp text in the text colour blended halfway to the background, and the lit bars
+and battery segments get a two-step halo of rectangles. CIQ renders font coverage in only 4 levels,
+so the halo is generated at full strength and quantises into three even glow steps.
+
+All four settings are also on the watch (hold the face > Settings, `ClaudeFaceSettings.mc`),
+including the prompt text via the watch's text entry (`WatchUi.TextPicker`) - the only way to set
+them on a sideloaded face, since Garmin Connect edits settings only for store installs.
+
 Updated: 2026-09-25
 
 ## Where the data comes from

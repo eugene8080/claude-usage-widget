@@ -105,6 +105,80 @@ def generate_outline(out_base: str, size: int, chars: str, stroke: int = 2,
         raise SystemExit("!!! %s is blank - a blank atlas silently kills all text" % out_base)
 
 
+GLOW_PAD = 8        # px of halo room around every glyph
+GLOW_SIGMA = 2.8    # gaussian blur radius of the halo
+GLOW_GAIN = 2.4     # coverage multiplier before clipping: the core reaches full coverage
+GLOW_PEAK = 1.0     # CIQ renders font coverage in only 4 levels (measured in the simulator:
+                    # 0 / 1/3 / 2/3 / 1), so a faint halo collapses into one flat band. A
+                    # full-strength halo quantises into three evenly spaced glow steps instead;
+                    # its brightness comes from the colour it is drawn in (the face blends the
+                    # text colour halfway to the background - ClaudeFaceView.GLOW_MIX).
+
+
+def glow_from_bmfont(src_base: str, out_base: str) -> None:
+    """A soft HALO font for an existing BMFont (Retro tube's "everything glows" tube effect).
+
+    Connect IQ can't blur, so the glow is pre-rendered like the time's glow bitmaps: every glyph
+    of `src_base` (.fnt + _0.png) is cropped from its atlas, padded by GLOW_PAD, gaussian-blurred
+    and scaled into a soft halo, and packed into a new atlas whose .fnt keeps the source's line
+    metrics and advances with every offset shifted by -GLOW_PAD. So drawing the same string with
+    the halo font at the same position lays the halo exactly under the sharp text; the face
+    draws the halo first, then the text (ClaudeFaceView.text / drawWeather). Coverage goes into
+    RGB and alpha, as for every CIQ font here.
+    """
+    import numpy as np
+    from scipy.ndimage import gaussian_filter
+
+    lines = open(src_base + ".fnt", encoding="utf-8").read().splitlines()
+    common = [l for l in lines if l.startswith("common ")][0]
+    info = [l for l in lines if l.startswith("info ")][0]
+    chars = [dict(kv.split("=", 1) for kv in l.split()[1:]) for l in lines if l.startswith("char ")]
+    src = np.asarray(Image.open(src_base + "_0.png").getchannel("A")).astype(float) / 255.0
+
+    halos = []
+    for c in chars:
+        x, y, w, h = int(c["x"]), int(c["y"]), int(c["width"]), int(c["height"])
+        cell = np.zeros((h + 2 * GLOW_PAD, w + 2 * GLOW_PAD))
+        if w > 0 and h > 0:
+            cell[GLOW_PAD:GLOW_PAD + h, GLOW_PAD:GLOW_PAD + w] = src[y:y + h, x:x + w]
+        halo = np.clip(gaussian_filter(cell, GLOW_SIGMA) * GLOW_GAIN, 0.0, GLOW_PEAK)
+        halos.append((c, halo))
+
+    # shelf-pack the halos into a power-of-two atlas, 512 wide
+    atlas_w, pen_x, pen_y, shelf_h, places = 512, 1, 1, 0, []
+    for c, halo in halos:
+        hh, ww = halo.shape
+        if pen_x + ww + 1 > atlas_w:
+            pen_x, pen_y, shelf_h = 1, pen_y + shelf_h + 1, 0
+        places.append((pen_x, pen_y))
+        pen_x += ww + 1
+        shelf_h = max(shelf_h, hh)
+    atlas_h = 1
+    while atlas_h < pen_y + shelf_h + 1:
+        atlas_h *= 2
+    cov = np.zeros((atlas_h, atlas_w))
+    out_lines = []
+    for (c, halo), (px_, py_) in zip(halos, places):
+        hh, ww = halo.shape
+        cov[py_:py_ + hh, px_:px_ + ww] = halo
+        out_lines.append(
+            "char id=%s x=%d y=%d width=%d height=%d xoffset=%d yoffset=%d xadvance=%s page=0 chnl=15"
+            % (c["id"], px_, py_, ww, hh, int(c["xoffset"]) - GLOW_PAD, int(c["yoffset"]) - GLOW_PAD,
+               c["xadvance"]))
+    c8 = Image.fromarray(np.round(cov * 255.0).astype(np.uint8), "L")
+    Image.merge("RGBA", (c8, c8, c8, c8)).save(out_base + "_0.png")
+    with open(out_base + ".fnt", "w", encoding="utf-8", newline="\n") as f:
+        f.write(info + "\n")
+        f.write(common.replace(common.split("scaleW=")[1].split()[0], str(atlas_w), 1)
+                .replace("scaleH=" + common.split("scaleH=")[1].split()[0], "scaleH=%d" % atlas_h) + "\n")
+        f.write('page id=0 file="%s_0.png"\n' % os.path.basename(out_base))
+        f.write("chars count=%d\n" % len(out_lines))
+        for ln in out_lines:
+            f.write(ln + "\n")
+    print("generated %s (halo of %s) atlas=%dx%d glyphs=%d"
+          % (os.path.basename(out_base), os.path.basename(src_base), atlas_w, atlas_h, len(out_lines)))
+
+
 def copy_icon_font() -> None:
     """The weather icons, as stm_icon: Claude Grid's generated cg_icon atlas (Tabler icons at
     24 px, incl. the composited cloud+sun / cloud+moon at 0xE001 / 0xE002), copied rather than
@@ -127,3 +201,6 @@ if __name__ == "__main__":
     generate_outline(os.path.join(OUT, "stm_time_o"), 70, TIME_CHARS, 2)
     generate(os.path.join(OUT, "stm_text"), 26, TEXT_CHARS, 256)    # editor: prompt size
     generate(os.path.join(OUT, "stm_small"), 25, TEXT_CHARS, 256)   # editor: date + rows size
+    # Retro tube's glow on everything: halo fonts for the prompt, the date/rows and the icons.
+    for base in ("stm_text", "stm_small", "stm_icon"):
+        glow_from_bmfont(os.path.join(OUT, base), os.path.join(OUT, base + "_glow"))

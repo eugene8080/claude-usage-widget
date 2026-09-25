@@ -74,6 +74,14 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private var _theme as Number = 0;                 // Theme setting: 0 Night Owl, 1 Retro tube
     private var _scanlines as Boolean = false;        // Scanlines setting: CRT lines instead of mesh
     private var _fontIcon as Graphics.FontType?;      // weather icons (stm_icon, from Claude Grid)
+    // Halo twins of the prompt / date+rows / icon fonts (Retro tube: everything glows).
+    private var _glowText as Graphics.FontType?;
+    private var _glowSmall as Graphics.FontType?;
+    private var _glowIcon as Graphics.FontType?;
+    private var _ink as Number = 0xFFFFFF;           // current text colour (see ink())
+    // Halo colour = the text colour blended this far from the background: the halo font's full-
+    // coverage core then shows at 50 %, its 2/3 and 1/3 steps at ~33 % and ~17 % (CIQ's 4 levels).
+    private const GLOW_MIX = 0.5;
 
     // IBM Plex Mono, loaded from resources - the terminal typeface for every element, at the
     // editor's sizes: prompt 26px, date + rows 25px, time 70px.
@@ -100,6 +108,9 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         _fontTime = WatchUi.loadResource(Rez.Fonts.STMonoTime) as Graphics.FontType;
         _fontTimeO = WatchUi.loadResource(Rez.Fonts.STMonoTimeOutline) as Graphics.FontType;
         _fontIcon = WatchUi.loadResource(Rez.Fonts.STIcon) as Graphics.FontType;
+        _glowText = WatchUi.loadResource(Rez.Fonts.STMonoGlow) as Graphics.FontType;
+        _glowSmall = WatchUi.loadResource(Rez.Fonts.STMonoSmallGlow) as Graphics.FontType;
+        _glowIcon = WatchUi.loadResource(Rez.Fonts.STIconGlow) as Graphics.FontType;
     }
 
     //! The prompt font (26px), falling back to the system font if the resource ever fails.
@@ -186,7 +197,64 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         } else if (just == Graphics.TEXT_JUSTIFY_RIGHT) {
             left -= dc.getTextWidthInPixels(s, font);
         }
+        glowText(dc, left, px(y), font, s);
         dc.drawText(left, px(y), font, s, Graphics.TEXT_JUSTIFY_LEFT);
+    }
+
+    // ---- tube glow (Retro tube theme) ----------------------------------------------------------
+    // Everything lit glows, like a phosphor tube. CIQ can't blur, so text gets a pre-rendered halo
+    // font drawn first in the same colour (its glyphs sit exactly under the sharp ones), and the
+    // lit bars / battery segments get a two-step halo of rectangles blended from the background
+    // towards their colour. High power only: always-on stays thin and unlit.
+
+    private function glowOn() as Boolean {
+        return _theme == THEME_RETRO && !_lowPower;
+    }
+
+    //! The halo font matching `font`, or null when there is none (the time uses glow bitmaps).
+    private function glowFontFor(font as Graphics.FontType) as Graphics.FontType? {
+        if (font == _fontText) { return _glowText; }
+        if (font == _fontSmall) { return _glowSmall; }
+        if (font == _fontIcon) { return _glowIcon; }
+        return null;
+    }
+
+    //! Draw `s`'s halo at (left, top) in the current colour, when the tube glow is on.
+    private function glowText(dc as Dc, left as Number, top as Number, font as Graphics.FontType,
+                              s as String) as Void {
+        if (!glowOn()) { return; }
+        var g = glowFontFor(font);
+        if (g != null) {
+            dc.setColor(mix(BG, _ink, GLOW_MIX), Graphics.COLOR_TRANSPARENT);
+            dc.drawText(left, top, g as Graphics.FontType, s, Graphics.TEXT_JUSTIFY_LEFT);
+            dc.setColor(_ink, Graphics.COLOR_TRANSPARENT);
+        }
+    }
+
+    //! Set the text colour and remember it, so glowText can draw the halo in a blend of it.
+    private function ink(dc as Dc, color as Number) as Void {
+        _ink = color;
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+    }
+
+    //! Soft halo behind a lit rectangle: +4 px at 14 % and +2 px at 30 % of the way from the
+    //! background to `color`. Pre-blended solid colours rather than alpha, so it looks the same on
+    //! every device and costs two fills.
+    private function haloRect(dc as Dc, x as Number, y as Number, w as Number, h as Number,
+                              color as Number) as Void {
+        if (!glowOn() || w <= 0 || h <= 0) { return; }
+        dc.setColor(mix(BG, color, 0.14), Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x - 4, y - 4, w + 8, h + 8);
+        dc.setColor(mix(BG, color, 0.30), Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x - 2, y - 2, w + 4, h + 4);
+    }
+
+    //! Linear blend of two 0xRRGGBB colours, t = 0 -> a, 1 -> b.
+    private function mix(a as Number, b as Number, t as Float) as Number {
+        var r = ((a >> 16) & 0xFF) + ((((b >> 16) & 0xFF) - ((a >> 16) & 0xFF)) * t);
+        var g = ((a >> 8) & 0xFF) + ((((b >> 8) & 0xFF) - ((a >> 8) & 0xFF)) * t);
+        var bl = (a & 0xFF) + (((b & 0xFF) - (a & 0xFF)) * t);
+        return (r.toNumber() << 16) | (g.toNumber() << 8) | bl.toNumber();
     }
 
     //! Pixel-snapped filled rectangle: integer edges, so bar ends are hard.
@@ -281,7 +349,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         // Blinking cursor (a no-op while the layout parks it off-screen). Not in always-on: a
         // once-a-minute update can't blink it.
         if (!_lowPower && System.getClockTime().sec % 2 == 0) {
-            dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
+            ink(dc, ACCENT);
             rect(dc, w * CURSOR_X - w * CURSOR_W / 2.0, h * CURSOR_Y, w * CURSOR_W, h * CURSOR_H);
         }
 
@@ -340,7 +408,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     //! Prompt line, time and date - the three lines the seconds repaint may touch.
     private function drawHeader(dc as Dc, w as Numeric, h as Numeric) as Void {
         // Prompt line (the PromptText setting), accent colour.
-        dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
+        ink(dc, ACCENT);
         text(dc, w * PROMPT_X, h * PROMPT_Y, ft(), _prompt, Graphics.TEXT_JUSTIFY_CENTER);
 
         drawTime(dc, w, h);
@@ -348,7 +416,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         // Date.
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         var dateStr = info.day_of_week + " " + info.month + " " + info.day.format("%d");
-        dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+        ink(dc, DIM);
         text(dc, w * DATE_X, h * DATE_Y, fs(), dateStr, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
@@ -377,7 +445,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
             var solid = timeFont();
             var full = _showSeconds ? t + ":00" : t;   // same width as any HH:MM:SS (monospace)
             var left = px(w * TIME_X) - dc.getTextWidthInPixels(full, solid) / 2;
-            dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+            ink(dc, VALUE);
             dc.drawText(left, ty, (_fontTimeO != null) ? _fontTimeO : solid, t,
                 Graphics.TEXT_JUSTIFY_LEFT);
             return;
@@ -389,7 +457,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         if (_fontTime != null && drawGlowTime(dc, px(w * TIME_X), ty, font, t)) {
             return;
         }
-        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+        ink(dc, VALUE);
         text(dc, w * TIME_X, ty, font, t, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
@@ -468,7 +536,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var y = h * yf;
         var pct = _pcts[slot];
 
-        dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+        ink(dc, DIM);
         text(dc, w * LABEL_X, y, fs(), _labels[slot], Graphics.TEXT_JUSTIFY_LEFT);
 
         // Bar: integer track, and an integer-width fill measured from the same left edge.
@@ -476,6 +544,12 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var bw = px(w * BAR_W);
         var by = px(y + w * BAR_DY);
         var bh = px(w * BAR_H);
+        // Tube glow: the lit fill's halo goes down first, so the track and fill draw over its
+        // inside and only the soft edge shows around the lit part.
+        if (pct > 0) {
+            var gfw = px(bw * ((pct > 100) ? 100 : pct) / 100.0);
+            haloRect(dc, bx, by, gfw, bh, pct >= 80 ? NEAR_CAP : ACCENT);
+        }
         if (!_lowPower) {   // always-on keeps only the filled part (see _lowPower)
             dc.setColor(TRACK, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(bx, by, bw, bh);
@@ -494,14 +568,14 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         }
 
         // Percentage.
-        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+        ink(dc, VALUE);
         var pctTxt = (pct >= 0) ? (pct.toString() + "%") : "--";
         text(dc, w * PCT_X, y, fs(), pctTxt, Graphics.TEXT_JUSTIFY_RIGHT);
 
         // Reset time.
         var reset = resetsAt(_resets[slot]);
         if (!reset.equals("")) {
-            dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+            ink(dc, DIM);
             text(dc, w * RESET_X, y, fs(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
         }
     }
@@ -522,10 +596,12 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         if (iconW > 0) {
             // The 24 px icon is centred on the 25 px text line: icon line box is ~29 px tall vs
             // the text's 33, so it sits 2 px lower to line up with the digits.
-            dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
+            ink(dc, ACCENT);
+            glowText(dc, left, top + 2, _fontIcon as Graphics.FontType, icon);
             dc.drawText(left, top + 2, _fontIcon as Graphics.FontType, icon, Graphics.TEXT_JUSTIFY_LEFT);
         }
-        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+        ink(dc, VALUE);
+        glowText(dc, left + iconW, top, font, temp);
         dc.drawText(left + iconW, top, font, temp, Graphics.TEXT_JUSTIFY_LEFT);
     }
 
@@ -651,6 +727,11 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         if (lit < 0) { lit = 0; }
         var on = (pct <= BATT_LOW) ? NEAR_CAP : ACCENT;
 
+        // Tube glow: every lit segment's halo first, so neighbouring halos merge in the gaps and no
+        // halo is drawn over a segment.
+        for (var i = 0; i < lit; i++) {
+            haloRect(dc, x0 + i * (sw + gap), y0, sw, bh, on);
+        }
         for (var i = 0; i < BATT_SEGS; i++) {
             if (i >= lit && _lowPower) { break; }   // always-on: lit segments only
             dc.setColor(i < lit ? on : TRACK, Graphics.COLOR_TRANSPARENT);

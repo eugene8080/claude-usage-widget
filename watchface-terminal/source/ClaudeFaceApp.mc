@@ -25,7 +25,14 @@ class ClaudeFaceApp extends Application.AppBase {
         return [_view as ClaudeFaceView];
     }
 
-    //! Garmin Connect settings saved (show seconds, prompt text): re-read and redraw.
+    //! On-watch settings (hold the face > Settings): prompt text, theme, scanlines, show seconds.
+    //! The only way to change them on a sideloaded face - see ClaudeFaceSettings.mc.
+    public function getSettingsView() as [Views] or [Views, InputDelegates] or Null {
+        var menu = new $.ClaudeFaceSettingsMenu();
+        return [menu, new $.ClaudeFaceSettingsDelegate(menu)];
+    }
+
+    //! Garmin Connect settings saved (show seconds, prompt text, theme, scanlines): re-read, redraw.
     public function onSettingsChanged() as Void {
         if (_view != null) { (_view as ClaudeFaceView).readSettings(); }
         WatchUi.requestUpdate();

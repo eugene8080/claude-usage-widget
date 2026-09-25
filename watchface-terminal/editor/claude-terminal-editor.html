@@ -121,7 +121,7 @@ const THEMES=[
 ];
 
 function defaults(){return {
-  font:"IBM Plex Mono", showSeconds:true, vfd:true, scanlines:false, theme:"night-owl",
+  font:"IBM Plex Mono", showSeconds:true, vfd:true, scanlines:false, tube:false, theme:"night-owl",
   bg:"#000000", accent:"#82aaff", val:"#d6deeb", dim:"#7f9c9c", track:"#333333", cap:"#ef5350", glow:"#82aaff",
   el:{
     prompt:{name:"Prompt line", kind:"text", x:0.434, y:0.187, size:26, text:"eugene@tactix ~ $"},
@@ -227,7 +227,7 @@ function drawEl(k){ const e=P.el[k];
 
 function draw(){ lowPower=document.getElementById("lowp").checked; P.vfd=document.getElementById("vfd").checked; P.scanlines=document.getElementById("scan").checked;
   ctx.fillStyle=lowPower?"#000000":P.bg; ctx.fillRect(0,0,SZ,SZ); boxes={};   // always-on is black whatever the theme
-  ["wx","prompt","time","date","rows","batt","cursor"].forEach(drawEl);
+  // Retro tube: everything lit glows (the face's halo fonts + halo rects); kept after colour edits.
   if(P.vfd && !lowPower){ if(P.scanlines) scanOverlay(); else meshOverlay(); }
   if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#D97757"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
@@ -345,7 +345,7 @@ document.getElementById("pvNow").onclick=function(){ pvNow(); syncPV(); draw(); 
 // Colours + themes
 const themeSel=document.getElementById("themeSel");
 THEMES.concat([["custom","Custom",null]]).forEach(([k,l])=>{ const o=document.createElement("option"); o.value=k; o.textContent=l; themeSel.appendChild(o); });
-function applyTheme(k){ const th=THEMES.find(t=>t[0]==k); if(!th) return; Object.assign(P,th[2]); P.theme=k; themeSel.value=k; linkAllColours(); draw(); }
+function applyTheme(k){ const th=THEMES.find(t=>t[0]==k); if(!th) return; Object.assign(P,th[2]); P.theme=k; P.tube=(k=="retro-tube"); themeSel.value=k; linkAllColours(); draw(); }
 themeSel.onchange=function(){ if(this.value!="custom") applyTheme(this.value); else { P.theme="custom"; draw(); } };
 function markCustom(){ P.theme="custom"; themeSel.value="custom"; }
 function linkVal(pid,hid,val){ document.getElementById(pid).value=val; document.getElementById(hid).value=val; }
@@ -357,7 +357,7 @@ bindColor("cDim","cDimH",v=>P.dim=v); bindColor("cTrk","cTrkH",v=>P.track=v); bi
 function linkAllColours(){ linkVal("cBg","cBgH",P.bg); linkVal("cAcc","cAccH",P.accent); linkVal("cVal","cValH",P.val); linkVal("cDim","cDimH",P.dim); linkVal("cTrk","cTrkH",P.track); linkVal("cCap","cCapH",P.cap); linkVal("cGlw","cGlwH",P.glow); }
 
 function refresh(){ const e=P.el; let L=[
-  "font: "+P.font, "theme: "+P.theme, "style: "+(P.vfd?"VFD (glow time + full-face mesh)":"plain"), "showSeconds: "+P.showSeconds, "scanlines: "+P.scanlines,
+  "font: "+P.font, "theme: "+P.theme, "style: "+(P.vfd?"VFD (glow time + full-face mesh)":"plain"), "showSeconds: "+P.showSeconds, "scanlines: "+P.scanlines, "tubeGlow: "+P.tube,
   "bg: "+P.bg+"  accent: "+P.accent+"  value: "+P.val+"  dim: "+P.dim+"  track: "+P.track+"  cap: "+P.cap+"  glow: "+P.glow, "",
   "prompt  x="+e.prompt.x.toFixed(3)+" y="+e.prompt.y.toFixed(3)+"  size="+e.prompt.size+"  text=\""+e.prompt.text+"\"",
   "time    x="+e.time.x.toFixed(3)+" y="+e.time.y.toFixed(3)+"  size="+e.time.size,
