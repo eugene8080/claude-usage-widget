@@ -48,7 +48,6 @@ DEV_KEY = Path.home() / ".garmin-keys" / "developer_key.der"
 
 # Everything the compiler reads. editor/, tools/, build/, dist/ are deliberately not staged.
 STAGE_ITEMS = ["manifest.xml", "monkey.jungle", "source", "resources",
-               "resources-round-260x260", "resources-round-280x280",
                "resources-round-416x416", "resources-round-454x454"]
 
 # Real app id in manifest.xml - replaced per variant so the variants never overwrite each other

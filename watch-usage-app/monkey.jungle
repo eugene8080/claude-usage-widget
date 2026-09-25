@@ -5,10 +5,8 @@ base.resourcePath = resources
 
 # The launcher icon must match each device's exact pixel size, so it lives in a
 # per-family resource folder rather than in the shared one - a single icon in
-# `resources` would be the wrong size on four of the five targets. Shared resources
+# `resources` would be the wrong size on some targets. Shared resources
 # (strings) stay in `resources` and are listed first on every path.
 fenix847mm.resourcePath = $(base.resourcePath);resources-round-454x454
 fenix8pro47mm.resourcePath = $(base.resourcePath);resources-round-454x454
 fenix843mm.resourcePath = $(base.resourcePath);resources-round-416x416
-fenix8solar47mm.resourcePath = $(base.resourcePath);resources-round-260x260
-fenix8solar51mm.resourcePath = $(base.resourcePath);resources-round-280x280

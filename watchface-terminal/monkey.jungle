@@ -1,17 +1,15 @@
 project.manifest = manifest.xml
 
-# Default build = the plain terminal face. The VFD style (glowing bitmap time + a full-face mesh,
-# the same scheme as Claude Grid) is compiled in by switching these three lines to:
-#   base.sourcePath = source;source-glow
-#   base.resourcePath = resources;resources-glow;resources-mesh
-#   base.excludeAnnotations = font_time;plain_overlay
-base.sourcePath = source
-base.resourcePath = resources
-base.excludeAnnotations = glow_time;mesh_overlay
+# Default build = the VFD style (glowing bitmap time + a full-face mesh, the same scheme as Claude
+# Grid). The plain terminal face (font time, no mesh) is compiled by switching these three lines to:
+#   base.sourcePath = source
+#   base.resourcePath = resources
+#   base.excludeAnnotations = glow_time;mesh_overlay
+base.sourcePath = source;source-glow
+base.resourcePath = resources;resources-glow;resources-mesh
+base.excludeAnnotations = font_time;plain_overlay
 
 # Per-family launcher icons (size-specific), same pattern as the watch-app.
 fenix847mm.resourcePath = $(base.resourcePath);resources-round-454x454
 fenix8pro47mm.resourcePath = $(base.resourcePath);resources-round-454x454
 fenix843mm.resourcePath = $(base.resourcePath);resources-round-416x416
-fenix8solar47mm.resourcePath = $(base.resourcePath);resources-round-260x260
-fenix8solar51mm.resourcePath = $(base.resourcePath);resources-round-280x280
