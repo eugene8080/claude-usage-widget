@@ -49,13 +49,26 @@ Then continue with first-run setup below.
 
 1. Open the **Claude Usage** app and tap **Sign in**, then complete the normal `claude.ai` login in the WebView. It closes automatically once it captures your session.
 2. Tap **Test fetch now** to confirm it prints your current `5H`, `1W` and `1W Fable` percentages. These should match `claude.ai/settings/usage`.
-3. Tap **Disable battery optimization** and allow it, so Android doesn't kill the 15-minute background refresh.
+3. **Let it run in the background — required.** The app opens a *Keep Claude Usage running* prompt (also under **Background settings**); follow both parts. See [Required phone settings](#-required-phone-settings) below.
 4. Long-press your home screen → **Widgets** → **Claude Usage**, drag it on, and resize it however you like. Tap it any time to refresh.
+
+## 🔋 Required phone settings
+
+The widget refreshes every 15 minutes and pushes to your Garmin watch **in the background**. Two separate layers of your phone can stop that, and both must allow it:
+
+1. **Android battery optimization → off for Claude Usage.** The prompt's **Allow** button asks for this directly (or *Settings → Apps → Claude Usage → Battery → Unrestricted*).
+2. **Your manufacturer's own battery manager → allow background activity**, for **Claude Usage and Garmin Connect** (Garmin Connect carries the Bluetooth messages to the watch). Apps can't read or change this switch, so the prompt opens each app's *App info* page for you:
+   - **Oppo / OnePlus / realme (ColorOS):** *App info → Battery usage →* **Allow background activity**. Without it, ColorOS freezes the app about 5 seconds after each background wake — the widget still updates, but the watch send is cut off every time.
+   - **Samsung (One UI):** *App info → Battery →* **Unrestricted**, and make sure neither app is in *Sleeping apps* / *Deep sleeping apps*.
+   - **Xiaomi / Redmi / POCO (HyperOS/MIUI):** *App info →* **Autostart** on, *Battery saver →* **No restrictions**.
+
+If a watch send is still stopped by the phone later, the prompt comes back and the app's **watch:** line reads *"stopped by the phone before it finished"*.
 
 ## 📋 Requirements
 
 - A Claude **Pro/Max** subscription (this reads consumer subscription usage, not API-key usage).
-- **Android 8.0 (API 26)** or newer. Built and tested on a Pixel 9 / Android 16.
+- **Android 8.0 (API 26)** or newer. Built and tested on a Pixel 9 / Android 16 and an Oppo Find N5 (ColorOS).
+- **Background activity allowed** for the app — see [Required phone settings](#-required-phone-settings).
 
 ---
 

@@ -135,6 +135,9 @@ object WatchBridge {
                 atEpochMs = System.currentTimeMillis(),
                 ok = result is PushResult.Sent,
                 detail = describe(result),
+                // Drives the app's "keep it running in the background" prompt.
+                stoppedBySystem = result is PushResult.Failed &&
+                    result.reason == REASON_STOPPED_BY_SYSTEM,
             )
         } catch (e: Exception) {
             // Storage is best-effort diagnostics; never let it turn a push into a crash.

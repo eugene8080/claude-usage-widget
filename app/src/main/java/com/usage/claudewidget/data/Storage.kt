@@ -114,16 +114,33 @@ class Storage private constructor(
     /** When a push last actually reached a watch, epoch ms; 0 when never. */
     val watchLastSentAt: Long get() = snapshot.getLong("watch_last_sent_at", 0L)
 
-    fun saveWatchPush(atEpochMs: Long, ok: Boolean, detail: String) {
+    /**
+     * Whether the last push was cut off by the phone's own background management (the job
+     * was stopped mid-send) - the one failure that a phone setting, not the watch, fixes.
+     */
+    val watchPushStoppedBySystem: Boolean
+        get() = snapshot.getBoolean("watch_push_stopped_by_system", false)
+
+    fun saveWatchPush(atEpochMs: Long, ok: Boolean, detail: String, stoppedBySystem: Boolean = false) {
         val edit = snapshot.edit()
             .putLong("watch_push_at", atEpochMs)
             .putBoolean("watch_push_ok", ok)
             .putString("watch_push_detail", detail)
+            .putBoolean("watch_push_stopped_by_system", stoppedBySystem)
         if (ok) {
             edit.putLong("watch_last_sent_at", atEpochMs)
         }
         edit.apply()
     }
+
+    /**
+     * When the user confirmed they allowed background activity in the "Keep it running in
+     * the background" prompt, epoch ms; 0 when never. The prompt stays away after that
+     * unless a later watch push is stopped by the system again.
+     */
+    var backgroundHelpAckAt: Long
+        get() = snapshot.getLong("background_help_ack_at", 0L)
+        set(v) = snapshot.edit().putLong("background_help_ack_at", v).apply()
 
     companion object {
         @Volatile private var instance: Storage? = null
