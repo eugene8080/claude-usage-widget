@@ -40,12 +40,19 @@ import com.usage.claudewidget.data.Storage
 import com.usage.claudewidget.data.UsageRepository
 import com.usage.claudewidget.watch.WatchBridge
 import com.usage.claudewidget.widget.UsageWidget
+import com.usage.claudewidget.work.RefreshScheduler
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Opening the app re-registers the 15-minute background refresh with the system, in
+        // case the OEM's background management dropped it (see RefreshScheduler). Only once
+        // signed in - before that there is nothing to fetch; sign-in schedules it itself.
+        if (Storage.get(this).isLoggedIn) {
+            RefreshScheduler.ensurePeriodic(this)
+        }
         setContent {
             AppTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
