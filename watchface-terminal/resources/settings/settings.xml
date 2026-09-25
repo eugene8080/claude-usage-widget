@@ -2,4 +2,7 @@
     <setting propertyKey="@Properties.ShowSeconds" title="@Strings.showSecondsTitle">
         <settingConfig type="boolean" />
     </setting>
+    <setting propertyKey="@Properties.PromptText" title="@Strings.promptTextTitle">
+        <settingConfig type="alphaNumeric" maxLength="24" />
+    </setting>
 </settings>

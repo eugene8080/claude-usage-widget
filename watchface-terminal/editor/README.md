@@ -1,29 +1,34 @@
 # Claude Terminal - layout editor
 
 A self-contained HTML editor for designing the **Claude Terminal** watch face (the CLI-styled
-face in `watchface/`). Same interaction model as the Claude Grid editor: click a line to select
-it, drag to move (snaps to centre), tune sizes and the meter columns with sliders, set hex
-colours, then **Copy the settings block** and hand it back to have it built into the face.
+face in `watchface-terminal/`). Same interaction model as the Claude Grid editor.
+
+Updated: 2026-09-25
 
 ## Use it
 
 Open `claude-terminal-editor.html` in any browser - no server or install needed (it fetches the
-selected Google Font on demand for the preview; everything else is inline). On a phone it works
-the same; the canvas is the 454x454 tactix 8 screen.
+selected Google Font on demand for the preview; everything else is inline). The canvas is the
+454x454 tactix 8 screen.
 
-## What you can edit
+- **Click** a line to select it; **drag** to move (snaps to align) or nudge with the **arrow
+  keys** (1 px, **Shift** = 10 px). **Tab** / **Shift+Tab** selects the next / previous element.
+- **Prompt text** is editable (select the prompt line). On the watch it is also a Garmin Connect
+  setting, so it can be changed later without a rebuild.
+- **Preview time & date** sliders (hour, minute, second, day, month, 12/24 h, **Now**) drive the
+  time and the date line - scrub them to check for overlaps.
+- **Theme** sets every colour at once: Claude, Claude Grid teal, IV-22, and the VS Code themes
+  (GitHub Dark, One Dark, Dracula, Monokai, Nord, Tokyo Night, Solarized, Synthwave, Night Owl).
+  Editing any colour switches it to Custom. The track stays a neutral dark grey.
+- **Font** from a grouped menu (56 monospace faces incl. a Dot matrix / pixel / LED group). A new
+  font replaces the old one only once it has loaded - no flash.
+- **VFD style** previews the glowing time + full-face mesh, with a **Time glow** colour.
 
-- **Prompt** line (text + position + size), **Time** (position + size, with a *Show seconds*
-  toggle), **Date** (position + size).
-- **Meter rows** as one block: row gap, text size, and each column - label x, bar x, bar width,
-  bar height, percent x, reset x.
-- **Cursor** block (position + width/height).
-- **Colours**: background, accent (prompt / bar fill / cursor), value (time + percent), dim
-  (date / labels / reset), track (empty bar), cap (bar fill at 80%+).
-- **Font**: any monospace family (a terminal must be mono).
+Text is placed exactly as the watch places it: every line is top-aligned and CIQ puts the glyph
+baseline at line top + font ascent + 1 row, with positions rounded to whole pixels - so the
+preview matches the simulator (checked: identical x, time identical y, text within 1 px).
 
-The preview uses sample data (5H 42%, 1W 63%, model 55%); on the watch the values come from the
-published Claude usage complications.
+**Copy settings** gives the block to hand back; it is built into the face.
 
 ## Regenerate
 
