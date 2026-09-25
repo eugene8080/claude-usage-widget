@@ -50,15 +50,29 @@ ICONS = {("0x%x" % cp): icon_datauri(cp) for cp in CPS}
 ICONS["cloudsun"] = composite_datauri(0xeb30)
 icons_js = "{" + ",".join('"%s":"%s"' % (k, v) for k, v in ICONS.items()) + "}"
 
-# Monospace-only (so every digit column lines up). All are genuine mono families on Google Fonts.
-FONTS = ["JetBrains Mono","Roboto Mono","Space Mono","Fira Code","Fira Mono","Source Code Pro",
- "IBM Plex Mono","Inconsolata","Ubuntu Mono","Ubuntu Sans Mono","PT Mono","Cousine","Courier Prime",
- "Overpass Mono","Nova Mono","Share Tech Mono","VT323","Major Mono Display","Xanh Mono","Spline Sans Mono",
- "Martian Mono","DM Mono","Red Hat Mono","Noto Sans Mono","B612 Mono","Azeret Mono","Anonymous Pro",
- "Cutive Mono","Fragment Mono","Syne Mono","Kode Mono","Oxygen Mono","Victor Mono","Lekton","Chivo Mono",
- "Reddit Mono","Geist Mono","Commit Mono","Nanum Gothic Coding","Doto","Sixtyfour","Silkscreen","Monofett"]
-fonts_js = "[" + ",".join('"%s"' % f for f in FONTS) + "]"
-
+# Font menu, grouped by style so it's navigable. Every face has FIXED-WIDTH DIGITS (so the time never
+# jitters); all are on Google Fonts. The dot-matrix group was checked 2026-09-25 (loads + ten equal
+# digit widths); rejected there for proportional digits: Pixelify Sans, Micro 5, Jersey 10-25,
+# Jacquard 12/24, Rubik Pixels, Bitcount Prop Single/Double. (Silkscreen's digits vary slightly but
+# it was already in the list.)
+FONT_GROUPS = [
+ ("Modern / neo-grotesque", ["Chivo Mono","Geist Mono","Reddit Mono","Fragment Mono","Commit Mono",
+   "DM Mono","Red Hat Mono","Spline Sans Mono","Martian Mono","Azeret Mono","Roboto Mono"]),
+ ("Coding / humanist", ["JetBrains Mono","Fira Code","Fira Mono","Source Code Pro","IBM Plex Mono",
+   "Inconsolata","Ubuntu Mono","Ubuntu Sans Mono","Noto Sans Mono","Oxygen Mono","Cousine","PT Mono",
+   "Nanum Gothic Coding","Anonymous Pro","Victor Mono"]),
+ ("Technical / squared", ["Share Tech Mono","Kode Mono","B612 Mono","Space Mono","Overpass Mono",
+   "Lekton","Nova Mono"]),
+ ("Typewriter / serif", ["Courier Prime","Cutive Mono","Xanh Mono"]),
+ ("Display / novelty", ["Major Mono Display","Syne Mono","Monofett"]),
+ ("Dot matrix / pixel / LED", ["Doto","Handjet","Bitcount Grid Double","Bitcount Grid Single",
+   "Bitcount Grid Double Ink","Bitcount Single","Bitcount Single Ink","Bitcount","DotGothic16",
+   "Press Start 2P","Tiny5","Workbench","Sixtyfour","Sixtyfour Convergence","VT323","Silkscreen"]),
+]
+_all = [f for _, fs in FONT_GROUPS for f in fs]
+assert len(_all) == len(set(_all)), "a font is listed in two groups"
+font_groups_js = "[" + ",".join('["%s",[%s]]' % (g, ",".join('"%s"' % f for f in fs))
+                                for g, fs in FONT_GROUPS) + "]"
 HTML = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Claude Grid - editor</title>
@@ -84,7 +98,7 @@ HTML = r"""<!doctype html>
   <div>
     <h1>Claude Grid - complication editor</h1>
     <p class="hint"><b>Click</b> a field (or the top arc) to select it. Set its <b>complication</b> and
-      sizes; <b>drag</b> to move (snaps to align) or nudge with the <b>arrow keys</b> (Shift = 10 px).
+      sizes; <b>drag</b> to move (snaps to align) or nudge with the <b>arrow keys</b> (Shift = 10 px); <b>Tab</b> / <b>Shift+Tab</b> selects the next / previous.
       Colours take <b>hex</b>. <b>Copy</b> the block back to me.</p>
     <canvas id="c" width="454" height="454"></canvas>
   </div>
@@ -128,6 +142,7 @@ HTML = r"""<!doctype html>
     </div>
     <div class="panel">
       <h2>Watch colours</h2>
+      <div class="row"><label title="sets every colour below at once; editing any colour switches to Custom">Theme</label><select id="themeSel"></select></div>
       <div class="row"><label>Accent</label><input type="color" id="cAcc"><input type="text" id="cAccH" class="hex"></div>
       <div class="row"><label title="most values">Text 1</label><input type="color" id="cT1"><input type="text" id="cT1H" class="hex"></div>
       <div class="row"><label title="Data 04/05 + date">Text 2</label><input type="color" id="cT2"><input type="text" id="cT2H" class="hex"></div>
@@ -145,7 +160,7 @@ HTML = r"""<!doctype html>
     </div>
   </div>
 <script>
-const ICONS=__ICONS__, FONTS=__FONTS__;
+const ICONS=__ICONS__, FONT_GROUPS=__FONT_GROUPS__;
 const IMG={}; let ready=0, total=Object.keys(ICONS).length;
 for(const k in ICONS){ const im=new Image(); im.onload=()=>{ready++; if(ready>=total) draw();}; im.src=ICONS[k]; IMG[k]=im; }
 function img(cp){ return typeof cp==="string" ? IMG[cp] : IMG["0x"+cp.toString(16)]; }
@@ -199,7 +214,7 @@ function valueOf(e,c){ return c ? (c.tz ? tzTime(e.city) : c.v) : ""; }
 const SEC_IDX=21;
 function defaults(){return {font:"Chivo Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",
   hourGlow:"#ffc4a4",minGlow:"#ff6e46",   // VFD glow colours (build_glow_digits.py --hour-glow / --minute-glow)
-  vfd:false,
+  vfd:false, theme:"claude",
   arc:{span:65,dashW:10,dashLen:15,frac:0.5,rad:228},
   el:{
   batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:24,num:24,sym:24},
@@ -321,10 +336,20 @@ cv.addEventListener("pointerup",()=>{ drag=null; guide=null; cv.style.cursor="gr
 // Keyboard nudge: arrows move the selected element 1 px (Shift = 10 px), with the same mirroring
 // as dragging. The battery arc moves radially (Up = toward the bezel), the week strip vertically
 // only - both as when dragged. Ignored while typing in a field, so arrows still work there.
+// Reading order of everything selectable - top to bottom, then left to right - from the CURRENT
+// positions, so Tab order follows the layout even after things are moved. Rows are bucketed to
+// ~3.5% of the screen so elements on the same line (e.g. Data 02 / 03) sort left to right.
+function tabOrder(){ const items=[["arc",(cy-P.arc.rad)/SZ,0.5]].concat(Object.keys(P.el).map(k=>[k,P.el[k].y,P.el[k].x]));
+  items.sort((a,b)=>(Math.round(a[1]/0.035)-Math.round(b[1]/0.035))||(a[2]-b[2])); return items.map(i=>i[0]); }
 document.addEventListener("keydown",ev=>{
-  if(!sel) return;
   const tag=(document.activeElement&&document.activeElement.tagName)||"";
-  if(tag=="INPUT"||tag=="SELECT"||tag=="TEXTAREA") return;
+  if(tag=="INPUT"||tag=="SELECT"||tag=="TEXTAREA"||tag=="BUTTON") return;
+  // Tab / Shift+Tab: select the next / previous element (wraps round; starts at the first if
+  // nothing is selected), ready to nudge with the arrows.
+  if(ev.key=="Tab"){ ev.preventDefault(); const o=tabOrder(); const i=o.indexOf(sel);
+    sel=(i<0)?o[ev.shiftKey?o.length-1:0]:o[(i+(ev.shiftKey?-1:1)+o.length)%o.length];
+    syncPanel(); draw(); return; }
+  if(!sel) return;
   const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key];
   if(!d) return;
   ev.preventDefault();                       // don't scroll the page
@@ -338,7 +363,11 @@ document.addEventListener("keydown",ev=>{
 });
 
 const compSel=document.getElementById("compSel"); COMPS.forEach((c,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=c.k; compSel.appendChild(o); });
-const fontSel=document.getElementById("fontSel"); FONTS.forEach(f=>{ const o=document.createElement("option"); o.value=f; o.textContent=f; fontSel.appendChild(o); });
+const fontSel=document.getElementById("fontSel");
+FONT_GROUPS.forEach(([label,list])=>{
+  const g=document.createElement("optgroup"); g.label=label;
+  list.forEach(f=>{ const o=document.createElement("option"); o.value=f; o.textContent=f; g.appendChild(o); });
+  fontSel.appendChild(g); });
 function show(id,on){ document.getElementById(id).style.display=on?"flex":"none"; }
 function cur(){ return sel=="arc"?P.arc:(sel?P.el[sel]:null); }
 function syncPanel(){ const e=sel&&sel!="arc"?P.el[sel]:null; const isArc=sel=="arc";
@@ -396,9 +425,33 @@ bindR("aradR","aradRV",0,v=>{P.arc.rad=v;});
 bindR("aspanR","aspanRV",0,v=>{P.arc.span=v;});
 bindR("adwR","adwRV",1,v=>{P.arc.dashW=v;});
 bindR("adlR","adlRV",0,v=>{P.arc.dashLen=v;});
+// Colour themes: each sets all nine watch colours. Claude = the face's current palette; IV-22 =
+// measured from Gumix's IV-22 digit art (core #a4f5e1, segment #1ec693); the VS Code themes use
+// the exact accent/foreground hexes from porttracker's chart THEMES (webapp.py), mapped as:
+// hour/values = foreground, icons+labels = comment grey (lifted to stay legible on black),
+// gradient/rings/glows = a pair of the theme's accents, accent = its vivid highlight.
+// The watch background stays black (AMOLED) in every theme.
+const THEMES=[
+ ["claude","Claude",{accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",hourGlow:"#ffc4a4",minGlow:"#ff6e46"}],
+ ["iv22","IV-22 (VFD teal)",{accent:"#a4f5e1",text1:"#1ec693",text2:"#7fe8c8",text3:"#13916b",hourCol:"#a4f5e1",grad1:"#5fe3bd",grad2:"#1ec693",hourGlow:"#1ec693",minGlow:"#1ec693"}],
+ ["github-dark","GitHub Dark",{accent:"#f78166",text1:"#79c0ff",text2:"#e6edf3",text3:"#8b949e",hourCol:"#e6edf3",grad1:"#58a6ff",grad2:"#bc8cff",hourGlow:"#a5d6ff",minGlow:"#58a6ff"}],
+ ["one-dark","One Dark",{accent:"#e06c75",text1:"#e5c07b",text2:"#abb2bf",text3:"#7f848e",hourCol:"#dcdfe4",grad1:"#61afef",grad2:"#c678dd",hourGlow:"#61afef",minGlow:"#61afef"}],
+ ["dracula","Dracula",{accent:"#ff79c6",text1:"#8be9fd",text2:"#f8f8f2",text3:"#6272a4",hourCol:"#f8f8f2",grad1:"#bd93f9",grad2:"#ff79c6",hourGlow:"#bd93f9",minGlow:"#ff79c6"}],
+ ["monokai","Monokai",{accent:"#f92672",text1:"#e6db74",text2:"#f8f8f2",text3:"#88846f",hourCol:"#f8f8f2",grad1:"#fd971f",grad2:"#f92672",hourGlow:"#e6db74",minGlow:"#fd971f"}],
+ ["nord","Nord",{accent:"#d08770",text1:"#88c0d0",text2:"#eceff4",text3:"#7b88a1",hourCol:"#eceff4",grad1:"#8fbcbb",grad2:"#5e81ac",hourGlow:"#88c0d0",minGlow:"#81a1c1"}],
+ ["tokyo-night","Tokyo Night",{accent:"#ff9e64",text1:"#7aa2f7",text2:"#c0caf5",text3:"#737aa2",hourCol:"#c0caf5",grad1:"#7dcfff",grad2:"#bb9af7",hourGlow:"#7aa2f7",minGlow:"#bb9af7"}],
+ ["solarized","Solarized",{accent:"#cb4b16",text1:"#b58900",text2:"#eee8d5",text3:"#839496",hourCol:"#fdf6e3",grad1:"#2aa198",grad2:"#268bd2",hourGlow:"#93a1a1",minGlow:"#2aa198"}],
+ ["synthwave","Synthwave",{accent:"#fede5d",text1:"#36f9f6",text2:"#ffffff",text3:"#848bbd",hourCol:"#ffffff",grad1:"#ff7edb",grad2:"#f97e72",hourGlow:"#ff7edb",minGlow:"#fc28a8"}],
+ ["night-owl","Night Owl",{accent:"#f78c6c",text1:"#82aaff",text2:"#d6deeb",text3:"#7f9c9c",hourCol:"#d6deeb",grad1:"#7fdbca",grad2:"#c792ea",hourGlow:"#82aaff",minGlow:"#7fdbca"}],
+];
+const themeSel=document.getElementById("themeSel");
+THEMES.concat([["custom","Custom",null]]).forEach(([k,l])=>{ const o=document.createElement("option"); o.value=k; o.textContent=l; themeSel.appendChild(o); });
+function applyTheme(k){ const th=THEMES.find(t=>t[0]==k); if(!th) return; Object.assign(P,th[2]); P.theme=k; themeSel.value=k; linkAllColours(); draw(); }
+themeSel.onchange=function(){ if(this.value!="custom") applyTheme(this.value); else { P.theme="custom"; draw(); } };
+function markCustom(){ P.theme="custom"; themeSel.value="custom"; }
 function bindColor(pid,hid,set){ const p=document.getElementById(pid), h=document.getElementById(hid);
-  p.oninput=()=>{ h.value=p.value; set(p.value); draw(); };
-  h.oninput=()=>{ let v=h.value.trim(); if(!/^#/.test(v)) v="#"+v; if(/^#[0-9a-fA-F]{6}$/.test(v)){ p.value=v; set(v); draw(); } }; }
+  p.oninput=()=>{ h.value=p.value; set(p.value); markCustom(); draw(); };
+  h.oninput=()=>{ let v=h.value.trim(); if(!/^#/.test(v)) v="#"+v; if(/^#[0-9a-fA-F]{6}$/.test(v)){ p.value=v; set(v); markCustom(); draw(); } }; }
 bindColor("cAcc","cAccH",v=>P.accent=v); bindColor("cT1","cT1H",v=>P.text1=v); bindColor("cT2","cT2H",v=>P.text2=v);
 bindColor("cT3","cT3H",v=>P.text3=v); bindColor("cHc","cHcH",v=>P.hourCol=v);
 bindColor("cG1","cG1H",v=>P.grad1=v); bindColor("cG2","cG2H",v=>P.grad2=v);
@@ -406,9 +459,28 @@ bindColor("cHg","cHgH",v=>P.hourGlow=v); bindColor("cMg","cMgH",v=>P.minGlow=v);
 document.getElementById("brandT").oninput=function(){ if(sel=="brand"){ P.el.brand.text=this.value; draw(); } };
 fontSel.onchange=function(){ setFont(this.value); };
 document.getElementById("lowp").onchange=draw;
-function setFont(name){ P.font=name; const id="gf-"+name.replace(/ /g,'-'); if(!document.getElementById(id)){ const l=document.createElement("link"); l.id=id; l.rel="stylesheet"; l.href="https://fonts.googleapis.com/css2?family="+name.replace(/ /g,"+")+"&display=swap"; document.head.appendChild(l); }
-  if(document.fonts&&document.fonts.load){ document.fonts.load("40px '"+name+"'").then(function(){draw();setTimeout(draw,150);}).catch(function(){draw();}); } setTimeout(draw,700); setTimeout(draw,1500); }
-function refresh(){ let L=["font: "+P.font,"style: "+(P.vfd?"VFD (glow time + full-face mesh)":"plain"),"glow: hour="+P.hourGlow+"  minute="+P.minGlow,"accent: "+P.accent,"text1: "+P.text1+"  text2: "+P.text2+"  text3: "+P.text3,"hour: "+P.hourCol+"  grad1: "+P.grad1+"  grad2: "+P.grad2,
+// Fonts load from Google Fonts on demand. To avoid a flash of a fallback face, the watch keeps
+// drawing in the CURRENT font until the new one is actually loaded, then switches once
+// (fontLoaded). Rapid scrolling through the menu only applies the latest pick (fontReq), and all
+// fonts are prefetched in the background after start-up so scrolling is usually instant.
+const _fontCss={};   // family -> Promise resolved when its Google Fonts stylesheet has loaded
+function fontCss(name){
+  if(!_fontCss[name]){ _fontCss[name]=new Promise(res=>{ const id="gf-"+name.replace(/ /g,'-');
+    let l=document.getElementById(id);
+    if(!l){ l=document.createElement("link"); l.id=id; l.rel="stylesheet"; l.href="https://fonts.googleapis.com/css2?family="+name.replace(/ /g,"+")+"&display=swap"; document.head.appendChild(l); }
+    else if(l.sheet){ res(); return; }
+    l.addEventListener("load",()=>res()); l.addEventListener("error",()=>res()); setTimeout(res,4000); }); }
+  return _fontCss[name]; }
+function fontLoaded(name){ return fontCss(name).then(()=> document.fonts&&document.fonts.load ? document.fonts.load("40px '"+name+"'").catch(()=>{}) : null); }
+let fontReq=0;
+function setFont(name){ const my=++fontReq;
+  const apply=()=>{ if(my!==fontReq) return; P.font=name; draw(); };
+  const giveUp=setTimeout(apply,5000);               // never get stuck on a font that won't load
+  fontLoaded(name).then(()=>{ clearTimeout(giveUp); apply(); }); }
+function prefetchFonts(){ const all=[].concat(...FONT_GROUPS.map(g=>g[1])); let i=0;
+  const next=()=>{ if(i>=all.length) return; const f=all[i++]; fontLoaded(f).then(()=>setTimeout(next,40)); };
+  next(); next(); }                                   // two at a time
+function refresh(){ let L=["font: "+P.font,"theme: "+P.theme,"style: "+(P.vfd?"VFD (glow time + full-face mesh)":"plain"),"glow: hour="+P.hourGlow+"  minute="+P.minGlow,"accent: "+P.accent,"text1: "+P.text1+"  text2: "+P.text2+"  text3: "+P.text3,"hour: "+P.hourCol+"  grad1: "+P.grad1+"  grad2: "+P.grad2,
   "arc: rad="+Math.round(P.arc.rad)+" span="+P.arc.span+" dashW="+P.arc.dashW+" dashLen="+P.arc.dashLen,""];
   for(const k in P.el){ const e=P.el[k]; let s=k.padEnd(6)+" ("+e.name+")  x="+e.x.toFixed(3)+" y="+e.y.toFixed(3);
     if(e.comp!=null) s+="  comp="+COMPS[e.comp].k; if(e.ring!=null) s+="  ring="+Math.round(e.ring)+"px";
@@ -420,10 +492,10 @@ function refresh(){ let L=["font: "+P.font,"style: "+(P.vfd?"VFD (glow time + fu
   out.value=L.join("\n"); }
 function linkAllColours(){ linkVal("cHg","cHgH",P.hourGlow); linkVal("cMg","cMgH",P.minGlow); linkVal("cAcc","cAccH",P.accent); linkVal("cT1","cT1H",P.text1); linkVal("cT2","cT2H",P.text2); linkVal("cT3","cT3H",P.text3); linkVal("cHc","cHcH",P.hourCol); linkVal("cG1","cG1H",P.grad1); linkVal("cG2","cG2H",P.grad2); }
 function copyOut(){ out.select(); document.execCommand("copy"); }
-function reset(){ P=defaults(); sel=null; guide=null; document.getElementById("vfd").checked=P.vfd; document.getElementById("fontSel").value=P.font; linkAllColours(); syncPanel(); setFont(P.font); }
+function reset(){ P=defaults(); sel=null; guide=null; themeSel.value=P.theme; document.getElementById("vfd").checked=P.vfd; document.getElementById("fontSel").value=P.font; linkAllColours(); syncPanel(); setFont(P.font); }
 linkAllColours();
-document.getElementById("fontSel").value=P.font; syncPanel(); setFont(P.font);
+document.getElementById("fontSel").value=P.font; syncPanel(); setFont(P.font); setTimeout(prefetchFonts,1500);
 </script></body></html>"""
-HTML = HTML.replace("__ICONS__", icons_js).replace("__FONTS__", fonts_js)
+HTML = HTML.replace("__ICONS__", icons_js).replace("__FONT_GROUPS__", font_groups_js)
 open(OUT, "w", encoding="utf-8").write(HTML)
 print("wrote", OUT, os.path.getsize(OUT), "bytes")
