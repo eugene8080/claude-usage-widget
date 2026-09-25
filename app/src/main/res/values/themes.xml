@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.ClaudeUsage" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Light variant; values-night/themes.xml overrides it for dark mode. The window theme
+         is what shows before Compose draws (and behind the sign-in WebView), so it has to
+         follow day/night too or dark mode opens on a white flash.
+         windowLightStatusBar: dark status-bar icons on the light background (API 23+). -->
+    <style name="Theme.ClaudeUsage" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
     <style name="Theme.ClaudeUsage.Widget" parent="" />
 </resources>

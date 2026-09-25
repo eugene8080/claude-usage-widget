@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Dark variant of values/themes.xml: dark window background and light status-bar icons. -->
     <style name="Theme.ClaudeUsage" parent="android:Theme.Material.NoActionBar" />
 </resources>

@@ -3,6 +3,7 @@ package com.usage.claudewidget.ui
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
 import android.provider.Settings
@@ -10,12 +11,18 @@ import android.text.format.DateUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -40,13 +47,34 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MaterialTheme {
+            AppTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     SetupScreen()
                 }
             }
         }
     }
+}
+
+/**
+ * Follows the system light/dark setting. A bare `MaterialTheme {}` always uses the light
+ * scheme, which is why this screen stayed white in dark mode.
+ *
+ * On Android 12+ the scheme is the wallpaper-derived dynamic one, the same palette the
+ * home-screen widget gets from GlanceTheme, so the app and the widget match. Older devices
+ * fall back to the stock Material 3 light/dark schemes.
+ */
+@androidx.compose.runtime.Composable
+private fun AppTheme(content: @androidx.compose.runtime.Composable () -> Unit) {
+    val dark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val scheme = when {
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
+            if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+        dark -> darkColorScheme()
+        else -> lightColorScheme()
+    }
+    MaterialTheme(colorScheme = scheme, content = content)
 }
 
 @androidx.compose.runtime.Composable
@@ -66,7 +94,9 @@ private fun SetupScreen() {
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        // safeDrawingPadding: targetSdk 35+ is always edge-to-edge, so without it the title
+        // is drawn under the status-bar clock.
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Claude Usage Widget", style = MaterialTheme.typography.headlineSmall)
