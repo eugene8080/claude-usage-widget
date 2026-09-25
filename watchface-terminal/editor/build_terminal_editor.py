@@ -80,7 +80,7 @@ HTML = r"""<!doctype html>
       <div class="row chk"><input type="checkbox" id="secs"><label style="flex:0 0 auto">Show seconds (HH:MM:SS)</label></div>
       <div class="row chk"><input type="checkbox" id="vfd"><label style="flex:0 0 auto" title="glowing bitmap time + one mesh over the whole face">VFD style (glow time + full-face mesh)</label></div>
       <div class="row chk"><input type="checkbox" id="scan"><label style="flex:0 0 auto" title="the watch's Scanlines setting: thin horizontal lines instead of the VFD mesh">Scanlines (old monitor)</label></div>
-      <div class="row chk"><input type="checkbox" id="lowp"><label style="flex:0 0 auto" title="what the watch shows in always-on: outline HH:MM, no mesh, no grey tracks">Low-power preview (always-on mode)</label></div>
+      <div class="row chk"><input type="checkbox" id="lowp"><label style="flex:0 0 auto" title="what the watch shows in always-on: outline HH:MM, no grey tracks, mesh / scanlines kept">Low-power preview (always-on mode)</label></div>
     </div>
     <div class="panel">
       <h2>Preview time &amp; date</h2>
@@ -268,7 +268,7 @@ function draw(){ lowPower=document.getElementById("lowp").checked; P.vfd=documen
   const tube=P.tube&&!lowPower; if(tube){ const g=hexRgb(P.glow); ctx.save(); ctx.shadowBlur=7; ctx.shadowColor="rgba("+g.join(",")+",0.7)"; }
   ["wx","prompt","time","date","rows","batt","cursor"].forEach(drawEl);
   if(tube) ctx.restore();
-  if(P.vfd && !lowPower){ if(P.scanlines) scanOverlay(); else meshOverlay(); }
+  if(P.vfd){ if(P.scanlines) scanOverlay(); else meshOverlay(); }   // also in always-on, as on the watch
   if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#D97757"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
     if(guide.x!=null){ ctx.beginPath(); ctx.moveTo(guide.x,0); ctx.lineTo(guide.x,SZ); ctx.stroke(); }

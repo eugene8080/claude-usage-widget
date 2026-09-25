@@ -14,7 +14,7 @@ import Toybox.WatchUi;
 //! Layout comes straight from the HTML layout editor: a prompt line, the big time, the date, then
 //! three CLI-style rows (5H / 1W / model) each with a bar, percentage and reset time, a segmented
 //! battery bar, and a blinking cursor. Night Owl colours on black, in IBM Plex Mono. In always-on
-//! the time drops to a thin outline HH:MM and the grey tracks and mesh go (see _lowPower).
+//! the time drops to a thin outline HH:MM and the grey tracks go; the mesh / scanlines stay (see _lowPower).
 //!
 //! The values come from the published complications. We can't construct a custom complication's Id
 //! directly (its identity is an internal UUID), so onShow ENUMERATES the available complications,
@@ -93,7 +93,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     // Always-on (low power), the same scheme as Claude Grid: onEnterSleep / onExitSleep flip it.
     // The AMOLED burn-in budget wants few, thin lit pixels, so while it is set the face draws
     // the time as HH:MM in the hollow outline font (no glow bitmaps, no seconds, no per-second
-    // repaint) left where the high-power HH:MM sits, drops the full-face mesh and every grey
+    // repaint) left where the high-power HH:MM sits, keeps the mesh / scanlines, drops every grey
     // track (meter bar backgrounds, unlit battery segments), draws the meter bars' filled part as
     // a 2 px hollow outline, and keeps the text and the lit battery segments.
     private var _lowPower as Boolean = false;
@@ -354,11 +354,11 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         }
 
         // VFD build: one screen-aligned mesh (or the CRT scanlines, per setting) over everything,
-        // drawn last (no-op otherwise). Skipped in always-on, like Claude Grid: it would break up
-        // the thin outline time.
-        if (!_lowPower) {
-            drawMeshOverlay(dc, w, h, 0, 0, w, h);
-        }
+        // drawn last (no-op otherwise). Kept in always-on too, so the face keeps its VFD / CRT
+        // character when the wrist is down: the overlay only DARKENS what is lit (black at partial
+        // alpha over a black background changes nothing), so it adds no lit pixels - it slightly
+        // lowers the burn-in load of the outline time and bars.
+        drawMeshOverlay(dc, w, h, 0, 0, w, h);
     }
 
     //! Always-on on: repaint once in the low-power style (see _lowPower).
