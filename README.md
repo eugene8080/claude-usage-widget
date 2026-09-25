@@ -111,18 +111,18 @@ is why the watch app must be installed (and opened once) for the faces to show C
 ### Claude Terminal
 
 - The three Claude meters as CLI rows (`5H`, `1W`, model) with bars, percentages and absolute
-  reset times, under an `fenix@tactix ~ $` prompt and the time, in IBM Plex Mono on the Night Owl
-  palette.
+  reset times, under a `fenix@tactix ~ $` prompt and the time, in IBM Plex Mono — by default on a
+  glowing green **retro tube** screen with scanlines (Night Owl blue is the alternative).
 - A segmented **battery bar** under the meters — Claude Grid's top battery arc, straightened (turns
   red at 20%).
 - **Weather** at the top, like Rad Lad: the current condition icon (sun / moon by time of day) and
   the temperature in the watch's units.
 - Settings — **on the watch** (hold the face → Settings) and in Garmin Connect for a store
   install: the **prompt text** (typed on the watch with its own keyboard — make the top line say
-  whatever you like), a **Retro tube** theme (green phosphor on a dark-green screen, Pip-Boy
-  style, where *everything* glows like a tube — text, bars, battery, weather; Night Owl when off),
-  **Scanlines** (thin horizontal lines like an old monitor, in place of the VFD mesh) and **Show
-  seconds**. A sideloaded face can only be set on the watch — Garmin Connect edits settings only
+  whatever you like), the **Retro tube** theme (**the default**: green phosphor on a dark-green
+  screen, Pip-Boy style, where *everything* glows like a tube — text, bars, battery, weather;
+  switch it off for Night Owl), **Scanlines** (thin horizontal lines like an old monitor, in place
+  of the VFD mesh; on by default) and **Show seconds**. A sideloaded face can only be set on the watch — Garmin Connect edits settings only
   for faces installed from the Connect IQ Store.
 - VFD style by default (glowing time + full-face mesh).
 - Always-on (low power), like Claude Grid: the time becomes a thin outline **HH:MM** that stays

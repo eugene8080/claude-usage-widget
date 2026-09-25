@@ -9,5 +9,5 @@
     <!-- on-watch settings menu -->
     <string id="settingsTitle">Claude Terminal</string>
     <string id="themeRetroToggle">Retro tube theme</string>
-    <string id="themeRetroSub">Off = Night Owl</string>
+    <string id="themeRetroSub">On by default; off = Night Owl</string>
 </strings>
