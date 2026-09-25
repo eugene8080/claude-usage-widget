@@ -11,8 +11,8 @@ import Toybox.WatchUi;
 //! The Claude terminal watch face.
 //!
 //! Layout comes straight from the HTML layout editor: a prompt line, the big time, the date, then
-//! three CLI-style rows (5H / 1W / model) each with a bar, percentage and reset time, and a
-//! blinking cursor. Night Owl colours on black, in IBM Plex Mono.
+//! three CLI-style rows (5H / 1W / model) each with a bar, percentage and reset time, a segmented
+//! battery bar, and a blinking cursor. Night Owl colours on black, in IBM Plex Mono.
 //!
 //! The values come from the published complications. We can't construct a custom complication's Id
 //! directly (its identity is an internal UUID), so onShow ENUMERATES the available complications,
@@ -43,6 +43,14 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     // so moving it back on-screen in the editor is a one-constant change.
     private const CURSOR_X = 0.526;  private const CURSOR_Y = 2.000;
     private const CURSOR_W = 0.030;  private const CURSOR_H = 0.028;
+    // Battery bar: the straight counterpart of Claude Grid's top battery arc, at the same scale
+    // (16 segments of 10 x 15 px, 5 px apart on the 454 px screen = 235 px long). Centred on
+    // BATT_X, top at BATT_Y, just below the meter rows. Sizes are fractions of the WIDTH, like
+    // the meter bars, so the bar keeps its proportions on every screen size.
+    private const BATT_X = 0.500;    private const BATT_Y = 0.845;
+    private const BATT_SEGS = 16;
+    private const BATT_SEG_W = 0.022; private const BATT_GAP = 0.011; private const BATT_H = 0.033;
+    private const BATT_LOW = 20;     // at or below this %, the lit segments turn NEAR_CAP red
 
     // One cache slot per meter. pct is -1 until a value arrives; resetEpoch 0 means none.
     private var _labels as Array<String> = ["5H", "1W", "--"];
@@ -206,6 +214,8 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         for (var i = 0; i < 3; i++) {
             drawRow(dc, i, w, h, ROWS_Y + ROWS_GAP * i);
         }
+
+        drawBattery(dc, w, h);
 
         // Blinking cursor (a no-op while the layout parks it off-screen).
         if (System.getClockTime().sec % 2 == 0) {
@@ -390,6 +400,33 @@ class ClaudeFaceView extends WatchUi.WatchFace {
             text(dc, w * RESET_X, y, fs(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
         }
     }
+    //! The watch battery as a straight row of segments - every edge on a whole pixel (integer
+    //! segment width, gap and origin), so the segments are as crisp as the meter bars. A segment
+    //! lights as soon as its share has started (ceil), so any charge left shows at least one;
+    //! at BATT_LOW or below the lit ones turn red. Redrawn once a minute with the full update,
+    //! which is plenty for a battery level.
+    private function drawBattery(dc as Dc, w as Numeric, h as Numeric) as Void {
+        var sw = px(w * BATT_SEG_W);
+        if (sw < 1) { sw = 1; }
+        var gap = px(w * BATT_GAP);
+        var bh = px(w * BATT_H);
+        if (bh < 1) { bh = 1; }
+        var total = BATT_SEGS * sw + (BATT_SEGS - 1) * gap;
+        var x0 = px(w * BATT_X) - total / 2;
+        var y0 = px(h * BATT_Y);
+
+        var pct = System.getSystemStats().battery;               // Float 0-100
+        var lit = Math.ceil(BATT_SEGS * pct / 100.0).toNumber();
+        if (lit > BATT_SEGS) { lit = BATT_SEGS; }
+        if (lit < 0) { lit = 0; }
+        var on = (pct <= BATT_LOW) ? NEAR_CAP : ACCENT;
+
+        for (var i = 0; i < BATT_SEGS; i++) {
+            dc.setColor(i < lit ? on : TRACK, Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(x0 + i * (sw + gap), y0, sw, bh);
+        }
+    }
+
     //! Absolute reset time, the way the phone and glance state it: clock time within a day,
     //! weekday within the week, month/day beyond. Empty when no reset is known.
     private function resetsAt(epochSec as Number) as String {
