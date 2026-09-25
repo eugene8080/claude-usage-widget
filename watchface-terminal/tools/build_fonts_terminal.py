@@ -1,7 +1,9 @@
 """Regenerate the Claude Terminal bitmap fonts into resources/fonts.
 
-Two atlases: the big time (digits + colon) and the small terminal text (printable ASCII for the
-prompt, date, meter labels, percentages and reset times). Sizes come from the layout editor.
+Three atlases: the big time (digits + colon), the prompt text, and the date/row text (both
+printable ASCII - the prompt is user-editable; the rows carry labels, percentages and reset
+times). Sizes come from the layout editor; keep them in step with its Copy settings block.
+The stm_* file names predate the typeface switch - they are the face's generic font slots.
 
 The face's typeface is the (TTF, FACE, WEIGHT) setting below - swap it to change the whole face.
 A terminal must be monospace, so every glyph (incl. the time's colon) gets the SAME advance.
@@ -18,8 +20,8 @@ from PIL import Image, ImageDraw, ImageFont
 HERE = os.path.dirname(__file__)
 OUT = os.path.join(HERE, "..", "resources", "fonts")
 # --- the face's typeface ---------------------------------------------------------------------
-TTF = os.path.join(HERE, "ShareTechMono-Regular.ttf")   # OFL - resources/fonts/OFL.txt
-FACE = "Share Tech Mono"
+TTF = os.path.join(HERE, "IBMPlexMono-Regular.ttf")   # OFL - resources/fonts/OFL.txt
+FACE = "IBM Plex Mono"
 WEIGHT = None       # static font; set a number (e.g. 400) for a variable TTF's weight axis
 
 TIME_CHARS = "0123456789:"
@@ -82,5 +84,6 @@ def generate(out_base: str, size: int, chars: str, atlas_w: int = 256) -> None:
 
 
 if __name__ == "__main__":
-    generate(os.path.join(OUT, "stm_time"), 90, TIME_CHARS, 256)
-    generate(os.path.join(OUT, "stm_text"), 26, TEXT_CHARS, 256)
+    generate(os.path.join(OUT, "stm_time"), 70, TIME_CHARS, 256)    # editor: time size
+    generate(os.path.join(OUT, "stm_text"), 26, TEXT_CHARS, 256)    # editor: prompt size
+    generate(os.path.join(OUT, "stm_small"), 25, TEXT_CHARS, 256)   # editor: date + rows size

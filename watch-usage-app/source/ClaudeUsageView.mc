@@ -41,8 +41,8 @@ class ClaudeUsageView extends WatchUi.View {
         dc.drawText(cx, h * 0.10, Graphics.FONT_XTINY, "Claude usage",
             Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Rows are spaced off the display height rather than fixed pixels, because the five
-        // supported devices span 260x260 to 454x454.
+        // Rows are spaced off the display height rather than fixed pixels, because the
+        // supported devices span 416x416 to 454x454.
         var rowH = h * 0.17;
         var firstY = h * 0.24;
         var barW = w * 0.54;
@@ -56,10 +56,14 @@ class ClaudeUsageView extends WatchUi.View {
                 Snapshot.percent(Snapshot.K_MODEL), Snapshot.resetAt(Snapshot.K_MODEL_RESET));
         }
 
-        if (Snapshot.isStale()) {
-            dc.setColor(STALE, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(cx, h * 0.83, Graphics.FONT_XTINY, "not updated recently",
-                Graphics.TEXT_JUSTIFY_CENTER);
+        // Always show the data's age - grey while fresh, amber once stale - so a watch that
+        // stopped receiving pushes is visible before the stale threshold, and how long it has
+        // been is readable without guessing.
+        var age = Snapshot.ageText();
+        if (!age.equals("")) {
+            dc.setColor(Snapshot.isStale() ? STALE : Graphics.COLOR_LT_GRAY,
+                Graphics.COLOR_TRANSPARENT);
+            dc.drawText(cx, h * 0.83, Graphics.FONT_XTINY, age, Graphics.TEXT_JUSTIFY_CENTER);
         }
 
         // Version at the bottom, dim - the watch app's own, so a sideload can be confirmed.

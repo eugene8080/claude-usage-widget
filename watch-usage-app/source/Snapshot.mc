@@ -74,6 +74,35 @@ module Snapshot {
         return (nowSec() - fetched) > STALE_AFTER_SEC;
     }
 
+    //! How old the numbers are, measured from the phone's fetch time: "updated 4m ago",
+    //! "updated 1h 20m ago", "updated 2d ago". Empty before the first push. A fetch time in
+    //! the future (phone clock ahead of the watch) reads as "just now" rather than negative.
+    //!
+    //! A bare "not updated recently" only said THAT the watch was stale; the age says how
+    //! stale, which tells one missed refresh (minutes) apart from a broken link (hours).
+    function ageText() as String {
+        var fetched = resetAt(K_FETCHED);
+        if (fetched == 0) {
+            return "";
+        }
+        var mins = (nowSec() - fetched) / 60;
+        if (mins < 1) {
+            return "updated just now";
+        }
+        if (mins < 60) {
+            return "updated " + mins.format("%d") + "m ago";
+        }
+        var hours = mins / 60;
+        if (hours < 24) {
+            // Minutes still matter for the first few hours ("1h 20m" vs "1h 55m"); past
+            // ten hours they are noise.
+            var rem = mins % 60;
+            var tail = (rem > 0 && hours < 10) ? " " + rem.format("%d") + "m" : "";
+            return "updated " + hours.format("%d") + "h" + tail + " ago";
+        }
+        return "updated " + (hours / 24).format("%d") + "d ago";
+    }
+
     function nowSec() as Number {
         return Time.now().value();
     }

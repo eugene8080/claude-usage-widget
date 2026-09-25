@@ -61,7 +61,7 @@ Then continue with first-run setup below.
 
 ## ⌚ On your Garmin watch
 
-<sub>Updated: 2026-09-25 · Built and tested on a tactix 8 (the `fenix847mm` Connect IQ profile); also builds for fēnix 8 43 mm, fēnix 8 Pro 47 mm and fēnix 8 Solar 47 / 51 mm.</sub>
+<sub>Updated: 2026-09-25 · Built and tested on a tactix 8 (the `fenix847mm` Connect IQ profile); also builds for fēnix 8 43 mm and fēnix 8 Pro 47 mm (the Solar models are not targeted).</sub>
 
 Three Connect IQ projects put the same usage numbers on a fēnix 8 / tactix 8 class watch:
 
@@ -97,10 +97,11 @@ is why the watch app must be installed (and opened once) for the faces to show C
 ### Claude Terminal
 
 - The three Claude meters as CLI rows (`5H`, `1W`, model) with bars, percentages and absolute
-  reset times, under a `claude ~ %` prompt and the time.
-- Settings (Garmin Connect): **Show seconds**, and the **prompt text** — make the top line say
-  whatever you like.
-- An optional VFD build (glowing time + full-face mesh) — see its README.
+  reset times, under an `eugene@tactix ~ $` prompt and the time, in IBM Plex Mono on the Night Owl
+  palette.
+- Settings (Garmin Connect): **Show seconds** (on by default), and the **prompt text** — make the
+  top line say whatever you like.
+- VFD style by default (glowing time + full-face mesh).
 
 ### Layout editors
 
@@ -115,9 +116,11 @@ is built into the face.
 
 ### Install on the watch
 
-Build a `.prg` (below), connect the watch by USB with its screen **awake and unlocked**, and drag the
-file into **`GARMIN/Apps`**. Install the watch app and whichever face(s) you want; pick the face from
-the watch's face list.
+Download the `.prg` for your watch from the [latest release](https://github.com/eugene8080/claude-usage-widget/releases/latest)
+(`ClaudeUsage-*` is the watch app, `ClaudeGrid-*` / `ClaudeFace-*` the two faces; `fenix847mm` is the
+fēnix 8 / tactix 8 47 & 51 mm) or build one (below). Connect the watch by USB with its screen
+**awake and unlocked** and drag the file into **`GARMIN/Apps`**. Install the watch app and whichever
+face(s) you want; pick the face from the watch's face list.
 
 ```bash
 monkeyc -f watchface-grid/monkey.jungle -o ClaudeGrid.prg -y <developer_key.der> -d fenix847mm -r
@@ -125,6 +128,20 @@ monkeyc -f watchface-grid/monkey.jungle -o ClaudeGrid.prg -y <developer_key.der>
 
 Needs the Connect IQ SDK and a developer key; each project's README has the details (fonts, the
 VFD assets and the generators that make them).
+
+### If the watch's numbers go stale
+
+The watch app shows how old its numbers are (*"updated 12m ago"*, amber past an hour). The phone app's
+status screen shows why, on its **watch:** line — the result of the last send and when a send last
+reached the watch. **Test fetch now** runs a fetch and a send on the spot.
+
+- ***"stopped by the phone before it finished"*** — the phone's battery manager froze the app mid-send.
+  Common on **Oppo / OnePlus / realme (ColorOS)**, which re-freezes a background app about 5 s after
+  waking it: the fetch and the widget fit in that window, the Bluetooth send does not. Fix: *Settings →
+  Apps → App management →* **Claude Usage** *→ Battery usage →* turn on **Allow background activity**
+  and **Allow auto launch** — and the same for **Garmin Connect**.
+- ***"no watch connected"*** — Bluetooth is off or Garmin Connect lost the watch; open Garmin Connect.
+- ***"Claude Usage app is not installed on the watch"*** — sideload `ClaudeUsage-*.prg` (above).
 
 ---
 

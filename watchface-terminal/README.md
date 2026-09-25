@@ -2,7 +2,8 @@
 
 A terminal/CLI-styled watch face for fenix 8 class watches (incl. tactix 8), modelled on the
 "Agentic Pro" look. Shows a prompt line, the time, the date, and the three Claude usage meters
-(5H / 1W / model) as CLI rows with bars, percentages, and reset times, in Share Tech Mono.
+(5H / 1W / model) as CLI rows with bars, percentages, and reset times, in IBM Plex Mono on the
+Night Owl palette, with a glowing VFD time.
 
 Updated: 2026-09-25
 
@@ -20,10 +21,13 @@ and the watch-app opened once so its 5-minute background publish is registered.
 
 ## Settings (Garmin Connect)
 
-- **Show seconds** (off by default) - the time shows `HH:MM:SS`, ticking via `onPartialUpdate`
-  when the device allows it.
-- **Prompt text** - the top line (default `claude ~ %`, up to 24 characters). The layout
+- **Show seconds** (on by default) - the time shows `HH:MM:SS`. In high-power mode the whole
+  face redraws every second. In always-on (low-power) mode the AMOLED tactix 8 doesn't call
+  `onPartialUpdate`, so it holds the last second until you raise your wrist.
+- **Prompt text** - the top line (default `eugene@tactix ~ $`, up to 24 characters). The layout
   editor's Prompt text is the default; the setting overrides it without a rebuild.
+- A face that was already installed keeps its **stored** settings when you sideload a new build.
+  So if it still shows the old prompt or no seconds, change them in Garmin Connect.
 
 ## Rendering
 
@@ -33,19 +37,31 @@ and the watch-app opened once so its 5-minute background publish is registered.
   so a white-RGB atlas compiles 1-bit and bold (the old build rendered `claude ~ %` as `claude - %`).
 - **Whole pixels.** Every text origin and every bar edge is snapped to an integer pixel
   (`text()` / `rect()` in the view), so bar ends are hard and glyphs aren't resampled.
-- **Optional VFD style** - the time drawn from pre-rendered glow bitmaps and one 3 px mesh tiled
-  over the whole face (same scheme as Claude Grid). Off by default; switch the three `base.*`
-  lines in `monkey.jungle` as its comment shows, after generating the assets:
+- **VFD style (the default build)** - the time drawn from pre-rendered glow bitmaps and one 3 px
+  mesh tiled over the whole face (same scheme as Claude Grid). The glow colours are baked into the
+  bitmaps, so regenerate them after changing the time font or the theme:
 
   ```
-  python tools/build_glow_time.py --face ffffff --glow d97757
+  python tools/build_glow_time.py --face d6deeb --glow 82aaff
   ```
+
+  To build the plain face, switch the three `base.*` lines in `monkey.jungle` as its comment shows.
+- **Seconds repaint.** `onPartialUpdate` clips to the time's real band. In the VFD build that is
+  the glow cell (`GlowTimeMetrics.Y0/H`); in the plain build it is the time font's line box. The
+  band is capped at the first meter row. Inside the clip it blanks the band and redraws the
+  prompt, time and date in full-update order, so a descender or a line box that crosses the band
+  is never cut off or double-drawn.
+- **Targets.** fenix 8 47mm / 51mm (= tactix 8), fenix 8 Pro 47mm and fenix 8 43mm - all AMOLED.
+  The fonts are fixed pixel sizes laid out for the 454 px tactix 8; the 416 px 43mm fits too.
+  The fenix 8 Solar models were dropped (not needed; their MIP screens can't show the glow).
 
 ## Fonts
 
-Share Tech Mono (OFL, `resources/fonts/OFL.txt`). To change the typeface, set `TTF` / `FACE` /
-`WEIGHT` at the top of `tools/build_fonts_terminal.py` and run it (then `build_glow_time.py`
-if you use the VFD build):
+IBM Plex Mono Regular (OFL, `resources/fonts/OFL.txt`), at the editor's sizes: prompt 26 px
+(`STMono`), date + rows 25 px (`STMonoSmall`), time 70 px (`STMonoTime`). The `stm_*` file names
+are the face's generic font slots, kept from the earlier Share Tech Mono build. To change the
+typeface or a size, edit `TTF` / `FACE` / `WEIGHT` and the `generate(...)` calls in
+`tools/build_fonts_terminal.py`, run it, then run `build_glow_time.py`:
 
 ```
 python tools/build_fonts_terminal.py
