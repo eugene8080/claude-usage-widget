@@ -32,7 +32,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private var DIM as Number = 0x7F9C9C;         // date, labels, reset times
     private var NEAR_CAP as Number = 0xEF5350;    // bar fill at 80%+
     private var BG as Number = 0x000000;          // high-power background (always-on is black)
-    private const DEFAULT_PROMPT = "eugene@tactix ~ $";
+    private const DEFAULT_PROMPT = "fenix@tactix ~ $";
     private const THEME_RETRO = 1;
 
     // --- layout (fractions of the screen), from the editor ---
@@ -52,7 +52,9 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     // (16 segments of 10 x 15 px, 5 px apart on the 454 px screen = 235 px long). Centred on
     // BATT_X, top at BATT_Y, just below the meter rows. Sizes are fractions of the WIDTH, like
     // the meter bars, so the bar keeps its proportions on every screen size.
-    private const BATT_X = 0.500;    private const BATT_Y = 0.845;
+    // BATT_Y puts the bar the same 37 px below the last Claude bar as the Claude bars are apart
+    // (bars at y 239 / 290 / 341, 14 px tall -> battery top 392; was 0.845 = 384, a 29 px gap).
+    private const BATT_X = 0.500;    private const BATT_Y = 0.863;
     private const BATT_SEGS = 16;
     private const BATT_SEG_W = 0.022; private const BATT_GAP = 0.011; private const BATT_H = 0.033;
     private const BATT_LOW = 20;     // at or below this %, the lit segments turn NEAR_CAP red

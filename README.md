@@ -111,7 +111,7 @@ is why the watch app must be installed (and opened once) for the faces to show C
 ### Claude Terminal
 
 - The three Claude meters as CLI rows (`5H`, `1W`, model) with bars, percentages and absolute
-  reset times, under an `eugene@tactix ~ $` prompt and the time, in IBM Plex Mono on the Night Owl
+  reset times, under an `fenix@tactix ~ $` prompt and the time, in IBM Plex Mono on the Night Owl
   palette.
 - A segmented **battery bar** under the meters — Claude Grid's top battery arc, straightened (turns
   red at 20%).

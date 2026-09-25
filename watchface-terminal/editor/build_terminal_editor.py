@@ -161,7 +161,7 @@ function defaults(){return {
   font:"IBM Plex Mono", showSeconds:true, vfd:true, scanlines:false, tube:false, theme:"night-owl",
   bg:"#000000", accent:"#82aaff", val:"#d6deeb", dim:"#7f9c9c", track:"#333333", cap:"#ef5350", glow:"#82aaff",
   el:{
-    prompt:{name:"Prompt line", kind:"text", x:0.434, y:0.187, size:26, text:"eugene@tactix ~ $"},
+    prompt:{name:"Prompt line", kind:"text", x:0.434, y:0.187, size:26, text:"fenix@tactix ~ $"},
     time:  {name:"Time",        kind:"time", x:0.500, y:0.234, size:70},
     date:  {name:"Date",        kind:"date", x:0.313, y:0.423, size:25},
     rows:  {name:"Meter rows",  kind:"rows", y:0.508, gap:0.113, size:25,
@@ -170,7 +170,7 @@ function defaults(){return {
     // Straight counterpart of Claude Grid's top battery arc, at the same scale: 16 segments,
     // 10 x 15 px on the 454 px screen, 5 px apart (235 px long). Centred on x, top-aligned at y;
     // starts just below the meter rows.
-    batt:  {name:"Battery bar", kind:"batt", x:0.500, y:0.845, segs:16, segW:0.022, gap:0.011, h:0.033},
+    batt:  {name:"Battery bar", kind:"batt", x:0.500, y:0.863, segs:16, segW:0.022, gap:0.011, h:0.033},
     // Weather line (Rad Lad style): condition icon + temperature, centred as a pair on x, top at y.
     wx:    {name:"Weather",     kind:"wx",   x:0.500, y:0.095, size:25},
   }};}

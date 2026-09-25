@@ -40,7 +40,7 @@ module FaceSettings {
     //! The prompt line's text (same default as properties.xml / the view).
     function readPrompt() as String {
         var v = Application.Properties.getValue("PromptText");
-        return (v instanceof Lang.String) ? (v as String) : "eugene@tactix ~ $";
+        return (v instanceof Lang.String) ? (v as String) : "fenix@tactix ~ $";
     }
 
     //! Same 24-character cap as the Garmin Connect setting (settings.xml maxLength), so a long

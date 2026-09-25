@@ -45,7 +45,7 @@ and the watch-app opened once so its 5-minute background publish is registered.
 - **Show seconds** (on by default) - the time shows `HH:MM:SS`. In high-power mode the whole
   face redraws every second. In always-on (low-power) mode the AMOLED tactix 8 doesn't call
   `onPartialUpdate`, so it holds the last second until you raise your wrist.
-- **Prompt text** - the top line (default `eugene@tactix ~ $`, up to 24 characters). The layout
+- **Prompt text** - the top line (default `fenix@tactix ~ $`, up to 24 characters). The layout
   editor's Prompt text is the default; the setting overrides it without a rebuild.
 - A face that was already installed keeps its **stored** settings when you sideload a new build.
   So if it still shows the old prompt or no seconds, change them in Garmin Connect.
