@@ -201,7 +201,10 @@ function drawEl(k){ const e=P.el[k];
   if(e.kind=="text"){ const x=e.x*SZ, y=e.y*SZ; ctx.fillStyle=P.accent; ctx.font=fnt(e.size); const w=ciqText(e.text,x,y,"center");
     boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+e.size+4]; return; }
   if(e.kind=="time"){ const x=e.x*SZ, y=e.y*SZ, t=timeStr(); ctx.fillStyle=P.val; ctx.font=fnt(e.size);
-    if(lowPower){ const w=ciqStroke(t,x,y,"center",P.val); boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+e.size+4]; return; }
+    // Always-on: HH:MM stays where it sits in high power - left edge of the centred HH:MM:SS
+    // (the face does the same), so only the seconds disappear.
+    if(lowPower){ const full=P.showSeconds?t+":00":t, fw=Math.round(ctx.measureText(full).width), left=Math.round(x)-Math.floor(fw/2);
+      ciqStroke(t,left,y,"left",P.val); boxes[k]=[left-4,y-4,left+fw+4,y+e.size+4]; return; }
     if(P.vfd){ const g=hexRgb(P.glow); ctx.save(); ctx.shadowBlur=16; ctx.shadowColor="rgba("+g.join(",")+",0.9)"; ciqText(t,x,y,"center"); ctx.restore(); }
     const w=ciqText(t,x,y,"center"); boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+e.size+4]; return; }
   if(e.kind=="date"){ const x=e.x*SZ, y=e.y*SZ, t=dateStr(); ctx.fillStyle=P.dim; ctx.font=fnt(e.size); const w=ciqText(t,x,y,"center");
@@ -212,7 +215,10 @@ function drawEl(k){ const e=P.el[k];
       // bars on whole pixels, like the face (rect() snaps every edge)
       const bx=Math.round(e.barX*SZ), bw=Math.round(e.barW*SZ), bh=Math.round(e.barH*SZ), by=Math.round(y+0.018*SZ);
       if(!lowPower){ ctx.fillStyle=P.track; ctx.fillRect(bx,by,bw,bh); }  // always-on: fill only
-      const fw=Math.round(bw*Math.min(100,r.pct)/100); ctx.fillStyle=(r.pct>=80)?P.cap:P.accent; ctx.fillRect(bx,by,fw,bh);
+      const fw=Math.round(bw*Math.min(100,r.pct)/100); ctx.fillStyle=(r.pct>=80)?P.cap:P.accent;
+      // always-on: the filled part as a 2 px hollow outline, drawn inside its box like the face's outlineRect()
+      if(lowPower && fw>4 && bh>4){ ctx.fillRect(bx,by,fw,2); ctx.fillRect(bx,by+bh-2,fw,2); ctx.fillRect(bx,by+2,2,bh-4); ctx.fillRect(bx+fw-2,by+2,2,bh-4); }
+      else ctx.fillRect(bx,by,fw,bh);
       ctx.fillStyle=P.val; ciqText(r.pct+"%", e.pctX*SZ, y, "right");
       ctx.fillStyle=P.dim; ciqText(r.rs, e.resetX*SZ, y, "right");
     }

@@ -117,8 +117,9 @@ is why the watch app must be installed (and opened once) for the faces to show C
 - Settings (Garmin Connect): **Show seconds** (on by default), and the **prompt text** — make the
   top line say whatever you like.
 - VFD style by default (glowing time + full-face mesh).
-- Always-on (low power), like Claude Grid: a thin outline **HH:MM**, no seconds or mesh, and only
-  the filled parts of the bars — about 7% of the screen lit.
+- Always-on (low power), like Claude Grid: the time becomes a thin outline **HH:MM** that stays
+  exactly where it was (only the seconds drop), the three Claude bars become outlines, and the
+  mesh and grey tracks go — about 6% of the screen lit.
 
 ### Layout editors
 
