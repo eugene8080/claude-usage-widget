@@ -228,6 +228,9 @@ function drawEl(k){ const e=P.el[k];
 function draw(){ lowPower=document.getElementById("lowp").checked; P.vfd=document.getElementById("vfd").checked; P.scanlines=document.getElementById("scan").checked;
   ctx.fillStyle=lowPower?"#000000":P.bg; ctx.fillRect(0,0,SZ,SZ); boxes={};   // always-on is black whatever the theme
   // Retro tube: everything lit glows (the face's halo fonts + halo rects); kept after colour edits.
+  const tube=P.tube&&!lowPower; if(tube){ const g=hexRgb(P.glow); ctx.save(); ctx.shadowBlur=7; ctx.shadowColor="rgba("+g.join(",")+",0.7)"; }
+  ["wx","prompt","time","date","rows","batt","cursor"].forEach(drawEl);
+  if(tube) ctx.restore();
   if(P.vfd && !lowPower){ if(P.scanlines) scanOverlay(); else meshOverlay(); }
   if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#D97757"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
