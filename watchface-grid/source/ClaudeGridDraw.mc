@@ -21,6 +21,34 @@ module GridDraw {
         return (r << 16) | (g << 8) | bl;
     }
 
+    //! Round any Numeric to the nearest whole pixel.
+    function px(v as Numeric) as Number {
+        return Math.round(v.toFloat()).toNumber();
+    }
+
+    //! Pixel-snapped drawText. Resolves the justification ourselves - integer centring against the
+    //! measured width, integer VCENTER against the font height - and hands CIQ an integer top-left
+    //! with LEFT justification, so no glyph is ever placed on a half pixel. With setAntiAlias(true)
+    //! a fractional origin risks the glyph bitmap being resampled across two pixel columns/rows,
+    //! which softens every edge.
+    //!
+    //! `just` takes the usual Graphics.TEXT_JUSTIFY_* flags. RIGHT is 0 in the API, so it is the
+    //! fall-through when neither the CENTER nor the LEFT bit is set.
+    function text(dc as Dc, x as Numeric, y as Numeric, font as Graphics.FontType, s as String,
+                  just as Number) as Void {
+        var left = px(x);
+        if ((just & Graphics.TEXT_JUSTIFY_CENTER) != 0) {
+            left -= dc.getTextWidthInPixels(s, font) / 2;
+        } else if ((just & Graphics.TEXT_JUSTIFY_LEFT) == 0) {
+            left -= dc.getTextWidthInPixels(s, font);
+        }
+        var top = px(y);
+        if ((just & Graphics.TEXT_JUSTIFY_VCENTER) != 0) {
+            top -= dc.getFontHeight(font) / 2;
+        }
+        dc.drawText(left, top, font, s, Graphics.TEXT_JUSTIFY_LEFT);
+    }
+
     //! Ring gauge: a dim full track, then a gradient arc from the top clockwise for `frac`.
     function gradientRing(dc as Dc, cx as Numeric, cy as Numeric, r as Numeric,
                           penW as Number, frac as Float) as Void {
@@ -38,11 +66,40 @@ module GridDraw {
         dc.setPenWidth(1);
     }
 
+    // Tick font geometry - must match tools/build_tick_font.py (HALF, FIRST_CODE; R_OUT = 50).
+    const TICK_HALF = 52;        // cell half-size: the dial centre is the cell's pixel corner
+    const TICK_FIRST = 0xE100;   // glyph code of tick 0 (12 o'clock), +1 per tick clockwise
+    var _tickChars as Array<String>? = null;   // the 60 one-glyph strings, built once
+
     //! Seconds sub-dial: 60 short radial ticks from the top clockwise, the elapsed ones lit in
     //! the gradient, the rest on the dim track. Matches the editor's tick-ring look.
-    function tickRing(dc as Dc, cx as Numeric, cy as Numeric, r as Numeric, frac as Float) as Void {
+    //!
+    //! With `tickFont` (cg_ticks) every tick is a pre-rasterised, exactly square-ended glyph, and
+    //! all 60 share one cell whose corner is the dial centre - so each is drawn from the same
+    //! integer origin and none is re-rasterised at a sub-pixel phase (the old drawLine ticks came
+    //! out uneven with soft round caps). `r` must be the generator's R_OUT (50) on that path.
+    //! The -1 on y offsets CIQ drawing font glyphs one row below their .fnt yoffset (measured).
+    function tickRing(dc as Dc, cx as Numeric, cy as Numeric, r as Numeric, frac as Float,
+                      tickFont as Graphics.FontType?) as Void {
         var n = 60;
         var lit = (n * frac).toNumber();
+        if (tickFont != null) {
+            if (_tickChars == null) {
+                var arr = new Array<String>[n];
+                for (var i = 0; i < n; i++) { arr[i] = (TICK_FIRST + i).toChar().toString(); }
+                _tickChars = arr;
+            }
+            var chars = _tickChars as Array<String>;
+            var ox = px(cx) - TICK_HALF;
+            var oy = px(cy) - TICK_HALF - 1;
+            for (var i = 0; i < n; i++) {
+                dc.setColor(i < lit ? lerp(GRAD_A, GRAD_B, i.toFloat() / n) : TRACK,
+                    Graphics.COLOR_TRANSPARENT);
+                dc.drawText(ox, oy, tickFont, chars[i], Graphics.TEXT_JUSTIFY_LEFT);
+            }
+            return;
+        }
+        // Fallback (font missing): the original anti-aliased line ticks.
         var innerLen = 9;
         dc.setPenWidth(2);
         for (var i = 0; i < n; i++) {

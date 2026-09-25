@@ -29,9 +29,27 @@ class ClaudeGridApp extends Application.AppBase {
 
     public function getInitialView() as [Views] or [Views, InputDelegates] {
         var view = new $.ClaudeGridView(_editMode);
+        _view = view;
         if (_editMode) {
             return [view, new $.ClaudeGridDelegate(view)];
         }
         return [view];
+    }
+
+    //! Kept so a settings change (phone or watch) can reach the running face.
+    private var _view as ClaudeGridView? = null;
+
+    //! On-watch settings: the Data 08 time-zone city and the "always the clock" switch.
+    public function getSettingsView() as [Views] or [Views, InputDelegates] or Null {
+        var menu = new $.ClaudeGridSettingsMenu();
+        return [menu, new $.ClaudeGridSettingsDelegate(menu)];
+    }
+
+    //! Garmin Connect (phone) settings were saved - re-read them and redraw.
+    public function onSettingsChanged() as Void {
+        if (_view != null) {
+            (_view as ClaudeGridView).readSettings();
+        }
+        WatchUi.requestUpdate();
     }
 }

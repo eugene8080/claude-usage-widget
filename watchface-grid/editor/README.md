@@ -1,7 +1,7 @@
 # Claude Grid layout editor
 
 A self-contained, drag-and-drop editor for designing the Claude Grid watch face layout.
-Updated: 2025-09-19.
+Updated: 2026-09-25.
 
 ## Use it
 Open **`claude-grid-editor.html`** in any browser (it's fully self-contained — the icons are
@@ -10,11 +10,27 @@ embedded as images, only the mono web-fonts load from Google Fonts). Then:
 - **Click** a field (or the top battery arc) to select it.
 - Set its **complication** (dropdown, incl. the three Claude meters), and its **ring radius /
   number px / symbol px** — all **absolute pixels**, so you can match sizes across fields.
-- **Drag** to move. **Snap to align** shows guides; **Mirror left/right** keeps the 2/4/6 (left)
-  and 3/5/7 (right) columns symmetric in position + size.
-- Colours take **hex**; the **time** has independent **hour** and **minute** colours.
+- **Drag** to move, or nudge the selected element with the **arrow keys** (1 px; **Shift** = 10 px;
+  the battery arc moves radially, the week strip vertically). **Snap to align** shows guides; **Mirror left/right** keeps the 02/04/06 (left)
+  and 03/05/08 (right) columns symmetric in position + size.
+- Colours take **hex**; the **time** has independent **hour** and **minute** colours, and in VFD
+  style independent **hour glow** / **minute glow** colours. Apply them to the face with
+  `python ../tools/build_glow_digits.py --hour-glow <hex> --minute-glow <hex>` (default minute
+  glow follows the minute's own gradient).
 - The **battery arc** is movable (drag up to the bezel) with width / dash width / dash length.
-- The **seconds dial (Data 08)** is a 60-tick ring and can hold any complication.
+- The **seconds dial (Data 07)** is a 60-tick ring with a **tick style** (2 px, 3 px, or tapered
+  3 -> 2 px) and a **knockout gap**: the black disc that cuts into the minute digits, as on the face.
+- **Data 08 (lower right)** defaults to the **Alt Time Zone** clock; pick its **city** (15 choices,
+  the same list as the face's settings) and the preview shows that city's live time.
+- **Preview time & date** sliders (hour, minute, second, day, month, 12/24 h, **Now**) drive the
+  big time, the seconds dial, the date, the weekday highlight and the Data 08 clock - scrub through
+  values to check for overlaps (e.g. wide minutes against the dial knockout). Preview only; they are
+  not part of the settings block.
+- **VFD style** previews test face I: glowing time + one 3 px mesh over the whole face.
+  **Low-power preview** shows always-on: the 2 px outline time and the stacked date in the knockout.
+- Complications preview what the face actually draws: weather = condition icon + temperature,
+  high/low = two right-aligned lines, VO2 max run/bike and training status = icons (status as a
+  short code such as PROD), day of week / date = text only, Quote Glance = price only.
 - Pick a **mono font** (43 options) — every digit column lines up.
 
 Hit **Copy settings** and paste the block back; it lists every element's position (fractions of
@@ -30,5 +46,6 @@ python build_editor.py
 ```
 
 ## Naming (Iron Grit "Data Position" system)
-Data 01 = top (battery by default) · 02/04/06 = left column · 03/05/07 = right column ·
-Data 08 = bottom seconds dial · plus Time, Date and the curved Week strip.
+Data 01 = top (inside the battery arc) · 02/04/06 = left column · 03/05/08 = right column ·
+Data 07 = bottom seconds dial · plus Time, Date and the curved Week strip. (This matches the face
+and its on-watch editor; older versions of this editor had 07 and 08 swapped.)

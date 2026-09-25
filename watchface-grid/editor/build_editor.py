@@ -16,10 +16,38 @@ def icon_datauri(cp):
     buf = BytesIO(); img.save(buf, "PNG")
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
+def composite_datauri(back_cp):
+    """Cloud with a small sun/moon behind it - the face's partly-cloudy icon (cg_icon 0xE001/2,
+    built the same way in ../tools/build_fonts_chivo.py): the cloud silhouette plus a moat is
+    cut out of the back glyph so the two outlines never touch."""
+    import numpy as np
+    from scipy.ndimage import binary_dilation, binary_fill_holes
+    S = 104
+    def layer(size, cp, dx, dy):
+        f = ImageFont.truetype(TTF, size)
+        im = Image.new("L", (S, S), 0)
+        ImageDraw.Draw(im).text((dx, dy), chr(cp), font=f, fill=255)
+        return np.asarray(im).astype(np.float64) / 255.0
+    cloud = layer(int(88 * 0.86), 0xea76, 4, 24)
+    back = layer(int(88 * 0.62), back_cp, 46, 4)
+    body = binary_fill_holes(cloud > 0.35)
+    cut = binary_dilation(body, iterations=4)
+    a = np.maximum(cloud, np.where(cut, 0.0, back))
+    rgba = np.zeros((S, S, 4), dtype=np.uint8)
+    rgba[..., 0], rgba[..., 1], rgba[..., 2] = GRAY[0], GRAY[1], GRAY[2]
+    rgba[..., 3] = np.round(a * 255).astype(np.uint8)
+    buf = BytesIO(); Image.fromarray(rgba, "RGBA").save(buf, "PNG")
+    return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
+
+# Every icon the face can draw (ClaudeGridView.iconCodeFor / weatherGlyph), incl. the ones added
+# 2026-09-25: run / bike (VO2 max), trending-up (training status), lungs (respiration),
+# thermometer (current temperature).
 CPS = [0xea34,0xec87,0xef92,0xea38,0xef62,0xeab1,0xeb38,0xec2c,0xeca5,0xef97,
        0xf0db,0xea97,0xff9b,0xea35,0xef1c,0xec31,0xea76,0xeaf8,0xf228,0xeb30,
-       0xea72,0xea73,0xea74,0xecd9,0xec34,0xec0b,0x10265,0xea04,0xeb54]
+       0xea72,0xea73,0xea74,0xecd9,0xec34,0xec0b,0x10265,0xea04,0xeb54,
+       0xec82,0xea36,0xeb43]
 ICONS = {("0x%x" % cp): icon_datauri(cp) for cp in CPS}
+ICONS["cloudsun"] = composite_datauri(0xeb30)
 icons_js = "{" + ",".join('"%s":"%s"' % (k, v) for k, v in ICONS.items()) + "}"
 
 # Monospace-only (so every digit column lines up). All are genuine mono families on Google Fonts.
@@ -56,7 +84,8 @@ HTML = r"""<!doctype html>
   <div>
     <h1>Claude Grid - complication editor</h1>
     <p class="hint"><b>Click</b> a field (or the top arc) to select it. Set its <b>complication</b> and
-      sizes; <b>drag</b> to move (snaps to align). Colours take <b>hex</b>. <b>Copy</b> the block back to me.</p>
+      sizes; <b>drag</b> to move (snaps to align) or nudge with the <b>arrow keys</b> (Shift = 10 px).
+      Colours take <b>hex</b>. <b>Copy</b> the block back to me.</p>
     <canvas id="c" width="454" height="454"></canvas>
   </div>
   <div class="side">
@@ -65,6 +94,17 @@ HTML = r"""<!doctype html>
       <div class="row chk"><input type="checkbox" id="snap" checked><label style="flex:0 0 auto">Snap to align (vertical + horizontal)</label></div>
       <div class="row chk"><input type="checkbox" id="mir" checked><label style="flex:0 0 auto">Mirror left/right (position + sizes)</label></div>
       <div class="row chk"><input type="checkbox" id="lowp"><label style="flex:0 0 auto">Low-power preview (always-on mode)</label></div>
+      <div class="row chk"><input type="checkbox" id="vfd"><label style="flex:0 0 auto" title="Test face I: glowing bitmap time + one mesh over the whole face">VFD style (glow time + full-face mesh)</label></div>
+    </div>
+    <div class="panel">
+      <h2>Preview time &amp; date</h2>
+      <div class="row"><label>Hour</label><input type="range" id="pvH" min="0" max="23" step="1"><span class="val" id="pvHV"></span></div>
+      <div class="row"><label>Minute</label><input type="range" id="pvM" min="0" max="59" step="1"><span class="val" id="pvMV"></span></div>
+      <div class="row"><label>Second</label><input type="range" id="pvS" min="0" max="59" step="1"><span class="val" id="pvSV"></span></div>
+      <div class="row"><label>Day</label><input type="range" id="pvD" min="1" max="31" step="1"><span class="val" id="pvDV"></span></div>
+      <div class="row"><label>Month</label><input type="range" id="pvMo" min="1" max="12" step="1"><span class="val" id="pvMoV"></span></div>
+      <div class="row chk"><input type="checkbox" id="pv24" checked><label style="flex:0 0 auto">24-hour</label><button class="sec" id="pvNow" style="margin:0 0 0 auto">Now</button></div>
+      <div class="muted">Drives the time, seconds dial, date, weekday highlight and the Data 08 clock. Preview only - not part of the settings block.</div>
     </div>
     <div class="panel">
       <h2>Selected: <span id="selName">- none -</span></h2>
@@ -81,6 +121,9 @@ HTML = r"""<!doctype html>
       <div id="ctlArcSpan" class="row" style="display:none"><label>Arc width</label><input type="range" id="aspanR" min="30" max="150" step="1"><span class="val" id="aspanRV"></span></div>
       <div id="ctlArcW" class="row" style="display:none"><label>Dash width</label><input type="range" id="adwR" min="1" max="10" step="0.5"><span class="val" id="adwRV"></span></div>
       <div id="ctlArcL" class="row" style="display:none"><label>Dash length</label><input type="range" id="adlR" min="4" max="28" step="1"><span class="val" id="adlRV"></span></div>
+      <div id="ctlTick" class="row" style="display:none"><label>Tick style</label><select id="tickSel"><option value="2px">2 px straight</option><option value="3px">3 px straight</option><option value="taper">Tapered 3 &rarr; 2 px</option></select></div>
+      <div id="ctlKnock" class="row" style="display:none"><label title="black gap cut around the dial, into the minute digits">Knockout gap</label><input type="range" id="knockR" min="0" max="16" step="1"><span class="val" id="knockRV"></span></div>
+      <div id="ctlCity" class="row" style="display:none"><label>Time zone</label><select id="citySel"></select></div>
       <div id="ctlNone" class="muted">Click a field on the watch to edit it.</div>
     </div>
     <div class="panel">
@@ -92,6 +135,8 @@ HTML = r"""<!doctype html>
       <div class="row"><label title="hour digits (solid)">Hour</label><input type="color" id="cHc"><input type="text" id="cHcH" class="hex"></div>
       <div class="row"><label title="ring/arc gradient start">Gradient 1</label><input type="color" id="cG1"><input type="text" id="cG1H" class="hex"></div>
       <div class="row"><label title="ring/arc gradient end">Gradient 2</label><input type="color" id="cG2"><input type="text" id="cG2H" class="hex"></div>
+      <div class="row"><label title="VFD style: halo around the hour digits">Hour glow</label><input type="color" id="cHg"><input type="text" id="cHgH" class="hex"></div>
+      <div class="row"><label title="VFD style: halo around the minute digits">Minute glow</label><input type="color" id="cMg"><input type="text" id="cMgH" class="hex"></div>
     </div>
     <div class="panel">
       <h2>Settings (paste back to me)</h2>
@@ -103,26 +148,58 @@ HTML = r"""<!doctype html>
 const ICONS=__ICONS__, FONTS=__FONTS__;
 const IMG={}; let ready=0, total=Object.keys(ICONS).length;
 for(const k in ICONS){ const im=new Image(); im.onload=()=>{ready++; if(ready>=total) draw();}; im.src=ICONS[k]; IMG[k]=im; }
-function img(cp){ return IMG["0x"+cp.toString(16)]; }
+function img(cp){ return typeof cp==="string" ? IMG[cp] : IMG["0x"+cp.toString(16)]; }
 const SZ=454, cx=SZ/2, cy=SZ/2; let GA=[181,80,47], GB=[255,192,138]; const DIM="#9a9a9a", TRACK="#3A2A22";
+// What the face actually draws for each type (ClaudeGridView.updateSlotText, 2026-09-25):
+// icon = cg_icon glyph, v = sample value, lb = label shown when there's no icon,
+// bare = value only (no icon, no label), stack = high/low on two right-aligned lines.
+// ORDER IS STABLE - saved layouts store the index - so new types are only ever appended.
 const COMPS=[
  {k:"Battery",ic:0xea34,v:"50%",lb:"BAT"},{k:"Steps",ic:0x10265,v:"8420",lb:"STEPS"},
  {k:"Heart Rate",ic:0xef92,v:"72",lb:"HR"},{k:"Body Battery",ic:0xea38,v:"64",lb:"BODY"},
- {k:"VO2 Max",ic:null,v:"48",lb:"VO2"},{k:"Pressure",ic:null,v:"758",lb:"mmHg"},
- {k:"Temperature",ic:null,v:"18°",lb:""},{k:"High/Low Temp",ic:0xeb38,v:"18°/9°",lb:"HL",stack:true},
+ {k:"VO2 Max Run",ic:0xec82,v:"52",lb:"VO2"},{k:"Pressure",ic:null,v:"1013",lb:"HPA"},
+ {k:"Current Temp",ic:0xeb38,v:"29°",lb:""},{k:"High/Low Temp",ic:null,v:"29°/27°",lb:"",stack:true},
  {k:"Calories",ic:0xec2c,v:"1240",lb:"CAL"},{k:"Floors",ic:0xeca5,v:"12",lb:"FLR"},
  {k:"Altitude",ic:0xef97,v:"340",lb:"ALT"},{k:"Stress",ic:0xf0db,v:"28",lb:"STR"},
- {k:"Pulse Ox",ic:null,pox:true,v:"98",lb:"SPO2"},{k:"Intensity Min",ic:0xff9b,v:"45",lb:"INT"},
+ {k:"Pulse Ox",ic:0xea97,v:"98",lb:"SPO2"},{k:"Intensity Min",ic:0xff9b,v:"45",lb:"INT"},
  {k:"Notifications",ic:0xea35,v:"3",lb:"NOTIF"},{k:"Sunrise",ic:0xef1c,v:"6:12",lb:"RISE"},
- {k:"Sunset",ic:0xec31,v:"19:48",lb:"SET"},{k:"Weather",ic:0xea76,v:"17°",lb:"WX"},
+ {k:"Sunset",ic:0xec31,v:"18:18",lb:"SET"},{k:"Current Weather",ic:"cloudsun",v:"29°",lb:""},
  {k:"Sleep Score",ic:0xeaf8,v:"82",lb:"SLP"},{k:"Recovery",ic:0xf228,v:"18",lb:"REC"},
  {k:"Solar",ic:0xeb30,v:"45",lb:"SOL"},{k:"Seconds",ic:null,v:"38",lb:"SEC",sec:true},
  {k:"Claude 5-hour",ic:null,v:"42%",lb:"5H"},{k:"Claude weekly",ic:null,v:"63%",lb:"1W"},
  {k:"Claude Fable",ic:null,v:"55%",lb:"FABLE"},
- {k:"Alt Time Zone",ic:0xeb54,v:"14:23",lb:"NY"},
+ {k:"Alt Time Zone",ic:0xeb54,v:"",lb:"",tz:true},
+ {k:"VO2 Max Bike",ic:0xea36,v:"48",lb:"VO2"},{k:"Training Status",ic:0xeb43,v:"PROD",lb:""},
+ {k:"Respiration",ic:0xef62,v:"14",lb:"RESP"},{k:"Day of Week",ic:null,v:"FRI 25",lb:"",bare:true},
+ {k:"Date",ic:null,v:"SEP 25",lb:"",bare:true},{k:"Quote Glance",ic:null,v:"227.52",lb:"QUOTE"},
 ];
+// Data 08's time-zone clock cities (AltTz.mc order), with their IANA zones for a live preview.
+const CITIES=[["New York","America/New_York"],["Chicago","America/Chicago"],["Los Angeles","America/Los_Angeles"],
+ ["London","Europe/London"],["Paris","Europe/Paris"],["Zurich","Europe/Zurich"],["Dubai","Asia/Dubai"],
+ ["Mumbai","Asia/Kolkata"],["Singapore","Asia/Singapore"],["Hong Kong","Asia/Hong_Kong"],["Shanghai","Asia/Shanghai"],
+ ["Tokyo","Asia/Tokyo"],["Sydney","Australia/Sydney"],["Auckland","Pacific/Auckland"],["UTC","UTC"]];
+// Preview clock: every time/date the face shows is drawn from PV, set by the "Preview time & date"
+// sliders (starts at the real now). Formats follow the face: hour "%02d" (12 h -> 01-12),
+// minute/second "%02d", date "SEP" + "19", weekday highlight = that date's day of week.
+const MONTHS=["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+let PV;
+function pvNow(){ const n=new Date(); PV={h:n.getHours(),m:n.getMinutes(),s:n.getSeconds(),day:n.getDate(),mon:n.getMonth()+1,year:n.getFullYear(),h24:PV?PV.h24:true}; }
+pvNow();
+function pad2(v){ return (v<10?"0":"")+v; }
+function daysIn(){ return new Date(PV.year,PV.mon,0).getDate(); }
+function previewDate(){ return new Date(PV.year,PV.mon-1,PV.day,PV.h,PV.m,PV.s); }
+function HH(){ let h=PV.h; if(!PV.h24){ h=h%12; if(h==0) h=12; } return pad2(h); }
+function MM(){ return pad2(PV.m); }
+function DD(){ return ""+PV.day; }
+function MON(){ return MONTHS[PV.mon-1]; }
+// Data 08's clock: the PREVIEW moment shown in that city's zone (so it moves with the sliders).
+function tzTime(city){ const z=(CITIES.find(c=>c[0]==city)||CITIES[0])[1];
+  try{ return new Intl.DateTimeFormat("en-GB",{timeZone:z,hour:"2-digit",minute:"2-digit",hour12:false}).format(previewDate()); }catch(e){ return "--:--"; } }
+function valueOf(e,c){ return c ? (c.tz ? tzTime(e.city) : c.v) : ""; }
 const SEC_IDX=21;
 function defaults(){return {font:"Chivo Mono",accent:"#ff531a",text1:"#ff9c75",text2:"#ffffff",text3:"#9a9a9a",hourCol:"#FFFFFF",grad1:"#ff9255",grad2:"#ff3c3b",
+  hourGlow:"#ffc4a4",minGlow:"#ff6e46",   // VFD glow colours (build_glow_digits.py --hour-glow / --minute-glow)
+  vfd:false,
   arc:{span:65,dashW:10,dashLen:15,frac:0.5,rad:228},
   el:{
   batt:{name:"Data 01 (battery)",kind:"horiz",x:0.500,y:0.092,comp:24,num:24,sym:24},
@@ -131,8 +208,8 @@ function defaults(){return {font:"Chivo Mono",accent:"#ff531a",text1:"#ff9c75",t
   d04:{name:"Data 04 (left ring)",kind:"ring",x:0.135,y:0.500,comp:22,ring:56,num:36,sym:24,frac:0.53},
   d05:{name:"Data 05 (right ring)",kind:"ring",x:0.865,y:0.500,comp:23,ring:56,num:36,sym:24,frac:0.72},
   d06:{name:"Data 06 (lower-left)",kind:"chip",x:0.166,y:0.724,comp:17,num:30,sym:24},
-  d08:{name:"Data 07 (lower-right)",kind:"chip",x:0.834,y:0.724,comp:25,num:30,sym:24},
-  sec:{name:"Data 08 (dial)",kind:"tick",x:0.500,y:0.832,comp:SEC_IDX,ring:50,num:30,sym:24,frac:0.63},
+  d08:{name:"Data 08 (lower-right)",kind:"chip",x:0.834,y:0.724,comp:25,num:30,sym:24,city:"New York"},
+  sec:{name:"Data 07 (seconds dial)",kind:"tick",x:0.500,y:0.832,comp:SEC_IDX,ring:50,num:30,sym:24,frac:0.63,tick:"2px",knock:5},
   time:{name:"Time",kind:"time",x:0.500,y:0.500,gap:56,num:139,fade:0.44},
   brand:{name:"Brand text",kind:"brand",x:0.500,y:0.169,num:36,text:"TACTIX"},
   alarmi:{name:"Alarm indicator",kind:"ind",x:0.166,y:0.169,sym:22,ic:0xea04},
@@ -152,9 +229,20 @@ function tintIcon(im,x,y,s,color){ _tcx.clearRect(0,0,160,160); _tcx.drawImage(i
 function ring(x,y,r,pen,frac,striped){ ctx.lineWidth=pen; ctx.strokeStyle=TRACK; ctx.beginPath(); ctx.arc(x,y,r,0,2*Math.PI); ctx.stroke();
   const steps=36,lit=Math.round(steps*frac); for(let i=0;i<lit;i++){ if(striped&&i%2==0)continue; ctx.strokeStyle=lerp(GA,GB,i/steps);
     ctx.beginPath(); ctx.arc(x,y,r,-Math.PI/2+i*2*Math.PI/steps,-Math.PI/2+(i+1)*2*Math.PI/steps); ctx.stroke(); } }
-function tickRing(x,y,r,frac){ const n=60,lit=Math.round(n*frac),len=9,pen=2; ctx.lineWidth=pen;
-  for(let i=0;i<n;i++){ const a=-Math.PI/2+i*2*Math.PI/n,c=Math.cos(a),s=Math.sin(a);
-    ctx.strokeStyle=i<lit?lerp(GA,GB,i/n):TRACK; ctx.beginPath(); ctx.moveTo(x+r*c,y+r*s); ctx.lineTo(x+(r-len)*c,y+(r-len)*s); ctx.stroke(); } }
+// Seconds ticks as filled square-ended quads (the face's pre-rasterised cg_ticks font): 2 px or
+// 3 px straight, or tapered 3 px (outer) -> 2 px (inner). Odd outer widths sit on a pixel centre,
+// even ones on a pixel corner, exactly like tools/build_tick_font.py, so 12/3/6/9 stay crisp.
+function tickRing(x,y,r,frac,style){ const n=60,lit=Math.round(n*frac),len=9;
+  const wo=style=="2px"?2:3, wi=style=="taper"?2:wo, off=(wo%2)?0.5:0; const X=x+off, Y=y+off, ro=r+off, ri=ro-len;
+  for(let i=0;i<n;i++){ const a=-Math.PI/2+i*2*Math.PI/n,c=Math.cos(a),s=Math.sin(a),px=-s,py=c;
+    ctx.fillStyle=i<lit?lerp(GA,GB,i/n):TRACK; ctx.beginPath();
+    ctx.moveTo(X+ro*c+px*wo/2,Y+ro*s+py*wo/2); ctx.lineTo(X+ro*c-px*wo/2,Y+ro*s-py*wo/2);
+    ctx.lineTo(X+ri*c-px*wi/2,Y+ri*s-py*wi/2); ctx.lineTo(X+ri*c+px*wi/2,Y+ri*s+py*wi/2); ctx.closePath(); ctx.fill(); } }
+// The VFD mesh (resources-mesh): every third screen row and column darkened 30%, one lattice for
+// the whole face. A 3x3 pattern tile so intersections are darkened once, as on the watch.
+const _mesh=document.createElement("canvas"); _mesh.width=3; _mesh.height=3;
+{ const m=_mesh.getContext("2d"), d=m.createImageData(3,3); for(let yy=0;yy<3;yy++) for(let xx=0;xx<3;xx++){ const o=(yy*3+xx)*4; d.data[o+3]=(xx==2||yy==2)?77:0; } m.putImageData(d,0,0); }
+function meshOverlay(){ ctx.fillStyle=ctx.createPattern(_mesh,"repeat"); ctx.fillRect(0,0,SZ,SZ); }
 function battArc(){ const a=P.arc, r=a.rad, n=16, lit=Math.round(n*a.frac), st=90+a.span/2, en=90-a.span/2; ctx.lineWidth=a.dashW;
   for(let i=0;i<n;i++){ const ang=(st-(st-en)*i/(n-1))*Math.PI/180, c=Math.cos(ang), s=Math.sin(ang);
     ctx.strokeStyle=i<lit?lerp(GA,GB,i/n):TRACK; ctx.beginPath(); ctx.moveTo(cx+r*c,cy-r*s); ctx.lineTo(cx+(r-a.dashLen)*c,cy-(r-a.dashLen)*s); ctx.stroke(); }
@@ -162,39 +250,53 @@ function battArc(){ const a=P.arc, r=a.rad, n=16, lit=Math.round(n*a.frac), st=9
 function tabular(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; let cw=0;
   for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2;
   for(let i=0;i<str.length;i++){ ctx.fillStyle=color; ctx.fillText(str[i],sx+cw*(i+0.5),y); } }
-function tabularStroke(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineWidth=Math.max(1.5,parseInt(f)*0.04); let cw=0; for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2; for(let i=0;i<str.length;i++){ ctx.strokeStyle=color; ctx.strokeText(str[i],sx+cw*(i+0.5),y); } }
+// Always-on outline time: 2 px, like the face's regenerated cg_time_o (was ~5.5 px here).
+function tabularStroke(str,x,y,f,color){ ctx.font=f; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.lineWidth=2; let cw=0; for(let d=0;d<=9;d++) cw=Math.max(cw,ctx.measureText(""+d).width); const sx=x-str.length*cw/2; for(let i=0;i<str.length;i++){ ctx.strokeStyle=color; ctx.strokeText(str[i],sx+cw*(i+0.5),y); } }
 function symbol(e,x,y){ const c=COMPS[e.comp], s=e.sym;
-  if(c && c.pox){ const rr=s*0.5; ctx.strokeStyle=P.text3; ctx.lineWidth=Math.max(1.5,s*0.07); ctx.beginPath(); ctx.arc(x,y,rr,0,2*Math.PI); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x-rr*0.72,y+rr*0.72); ctx.lineTo(x+rr*0.72,y-rr*0.72); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x-rr*0.5,y); ctx.lineTo(x-rr*0.18,y+rr*0.3); ctx.lineTo(x+rr*0.12,y-rr*0.25); ctx.lineTo(x+rr*0.45,y+rr*0.2); ctx.stroke(); return; }
+  if(c && c.bare) return;
   if(c && c.ic!=null){ const im=img(c.ic); if(im&&im.complete) tintIcon(im,x,y,s,P.text3); return; }
   ctx.fillStyle=P.text3; ctx.font=num(Math.round(s*0.72)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(c?c.lb:"",x,y); }
 function drawEl(k){ const e=P.el[k], x=e.x*SZ, y=e.y*SZ, c=COMPS[e.comp]; ctx.textAlign="center"; ctx.textBaseline="middle";
-  if(e.kind=="time"){ const f=num(e.num); const mmy=y+e.gap, topY=mmy-e.num*0.42, botY=mmy+e.num*0.42; const g=ctx.createLinearGradient(0,topY,0,botY); const fw=Math.max(0.001,e.fade); g.addColorStop(0,P.grad1); g.addColorStop(Math.max(0,0.5-fw*0.5),P.grad1); g.addColorStop(Math.min(1,0.5+fw*0.5),P.grad2); g.addColorStop(1,P.grad2); if(lowPower){ tabularStroke("01",x,y-e.gap,f,P.hourCol); tabularStroke("33",x,mmy,f,g); } else { tabular("01",x,y-e.gap,f,P.hourCol); tabular("33",x,mmy,f,g); } boxes[k]=[x-e.num*0.62,y-e.gap-e.num*0.42,x+e.num*0.62,y+e.gap+e.num*0.42]; return; }
+  if(e.kind=="time"){ const f=num(e.num); const mmy=y+e.gap, topY=mmy-e.num*0.42, botY=mmy+e.num*0.42; const g=ctx.createLinearGradient(0,topY,0,botY); const fw=Math.max(0.001,e.fade); g.addColorStop(0,P.grad1); g.addColorStop(Math.max(0,0.5-fw*0.5),P.grad1); g.addColorStop(Math.min(1,0.5+fw*0.5),P.grad2); g.addColorStop(1,P.grad2); if(lowPower){ tabularStroke(HH(),x,y-e.gap,f,P.hourCol); tabularStroke(MM(),x,mmy,f,g); }
+    else if(P.vfd){ // glow digits (resources-glow-vfd): peach bloom on the hour, orange-red on the minute
+      const hg=hexRgb(P.hourGlow), mg=hexRgb(P.minGlow);
+      ctx.save(); ctx.shadowBlur=16; ctx.shadowColor="rgba("+hg.join(",")+",0.85)"; tabular(HH(),x,y-e.gap,f,P.hourCol);
+      ctx.shadowColor="rgba("+mg.join(",")+",0.9)"; tabular(MM(),x,mmy,f,g); ctx.restore(); }
+    else { tabular(HH(),x,y-e.gap,f,P.hourCol); tabular(MM(),x,mmy,f,g); } boxes[k]=[x-e.num*0.62,y-e.gap-e.num*0.42,x+e.num*0.62,y+e.gap+e.num*0.42]; return; }
   if(e.kind=="brand"){ ctx.fillStyle=P.text3; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(e.text,x,y); boxes[k]=[x-70,y-18,x+70,y+18]; return; }
   if(e.kind=="ind"){ const im=img(e.ic); if(im&&im.complete) tintIcon(im,x,y,e.sym,P.text3); boxes[k]=[x-e.sym/2-5,y-e.sym/2-5,x+e.sym/2+5,y+e.sym/2+5]; return; }
-  if(e.kind=="date"){ if(lowPower){ ctx.fillStyle=P.text2; ctx.font=num(Math.round(e.num*0.85)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("19",x,y-e.num*0.42); ctx.fillText("SEP",x,y+e.num*0.42); boxes[k]=[x-40,y-e.num*0.85,x+40,y+e.num*0.85]; return; } const d=e.gap; ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.fillText("SEP",x-d,y); ctx.fillText("19",x+d,y); boxes[k]=[x-d-42,y-24,x+d+42,y+24]; return; }
+  if(e.kind=="date"){ if(lowPower){ ctx.fillStyle=P.text2; ctx.font=num(Math.round(e.num*0.85)); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(DD(),x,y-e.num*0.42); ctx.fillText(MON(),x,y+e.num*0.42); boxes[k]=[x-40,y-e.num*0.85,x+40,y+e.num*0.85]; return; } const d=e.gap; ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.fillText(MON(),x-d,y); ctx.fillText(DD(),x+d,y); boxes[k]=[x-d-42,y-24,x+d+42,y+24]; return; }
   if(e.kind=="week"){ const R=y-cy, sp=e.span, st=90+sp/2; ctx.font=num(e.num);
     for(let i=0;i<7;i++){ const th=(st-(sp/6)*i)*Math.PI/180, lx=cx+R*Math.cos(th), ly=cy+R*Math.sin(th);
-      ctx.save(); ctx.translate(lx,ly); ctx.rotate(th-Math.PI/2); ctx.fillStyle=i==5?P.accent:P.text3; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("SMTWTFS"[i],0,0); ctx.restore(); }
+      ctx.save(); ctx.translate(lx,ly); ctx.rotate(th-Math.PI/2); ctx.fillStyle=i==previewDate().getDay()?P.accent:P.text3; ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText("SMTWTFS"[i],0,0); ctx.restore(); }
     boxes[k]=[cx-110,y-26,cx+110,y+18]; return; }
   const isSec=c&&c.sec;
-  if(e.kind=="tick"){ if(lowPower) return; const rr=e.ring; tickRing(x,y,rr,e.frac); symbol(e,x,y-rr*0.5);
-    ctx.fillStyle=isSec?P.accent:P.text1; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(c?c.v:"",x,y+e.num*0.3); boxes[k]=[x-rr-4,y-rr-4,x+rr+4,y+rr+4]; return; }
+  if(e.kind=="tick"){ if(lowPower) return; const rr=e.ring; tickRing(x,y,rr,isSec?PV.s/60:e.frac,e.tick||"2px"); symbol(e,x,y-rr*0.5);
+    ctx.fillStyle=isSec?P.accent:P.text1; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(isSec?pad2(PV.s):valueOf(e,c),x,y+e.num*0.3); boxes[k]=[x-rr-4,y-rr-4,x+rr+4,y+rr+4]; return; }
   if(e.kind=="ring"){ const rr=e.ring; if(!lowPower) ring(x,y,rr,6,e.frac,false); symbol(e,x,y-rr*0.42);
-    ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(c?c.v:"",x,y+e.num*0.28); boxes[k]=[x-rr-4,y-rr-4,x+rr+4,y+rr+4]; return; }
-  if(e.kind=="horiz"){ ctx.font=num(e.num); const vw=ctx.measureText(c.v).width; let iw=0, lbl=null;
+    ctx.fillStyle=P.text2; ctx.font=num(e.num); ctx.textAlign="center"; ctx.textBaseline="middle"; ctx.fillText(valueOf(e,c),x,y+e.num*0.28); boxes[k]=[x-rr-4,y-rr-4,x+rr+4,y+rr+4]; return; }
+  if(e.kind=="horiz"){ const hv=valueOf(e,c); ctx.font=num(e.num); const vw=ctx.measureText(hv).width; let iw=0, lbl=null;
     if(c.ic!=null){ iw=e.sym; } else { lbl=c.lb; ctx.font=num(Math.round(e.sym*0.72)); iw=ctx.measureText(lbl).width; ctx.font=num(e.num); }
     const gap=iw>0?7:0, tot=iw+gap+vw, sx=x-tot/2;
     if(c.ic!=null){ const im=img(c.ic); if(im&&im.complete) tintIcon(im,sx+e.sym/2,y,e.sym,P.text3); }
     else if(lbl){ ctx.fillStyle=P.text3; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.font=num(Math.round(e.sym*0.72)); ctx.fillText(lbl,sx,y); }
-    ctx.fillStyle=P.text1; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.font=num(e.num); ctx.fillText(c.v,sx+iw+gap,y); ctx.textAlign="center"; boxes[k]=[x-tot/2-6,y-e.num*0.7,x+tot/2+6,y+e.num*0.7]; return; }
+    ctx.fillStyle=P.text1; ctx.textAlign="left"; ctx.textBaseline="middle"; ctx.font=num(e.num); ctx.fillText(hv,sx+iw+gap,y); ctx.textAlign="center"; boxes[k]=[x-tot/2-6,y-e.num*0.7,x+tot/2+6,y+e.num*0.7]; return; }
   if(!(c&&c.stack)) symbol(e,x,y-e.sym-4); ctx.textAlign="center"; ctx.textBaseline="middle";
-  if(c&&c.stack){ const p=c.v.split("/"); ctx.font=num(Math.round(e.num*0.72)); ctx.fillStyle=P.text1; ctx.fillText(p[0],x,y-e.num*0.44);
-    ctx.strokeStyle=P.text3; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(x-e.num*0.6,y); ctx.lineTo(x+e.num*0.6,y); ctx.stroke(); ctx.fillText(p[1]||"",x,y+e.num*0.44); }
-  else { ctx.fillStyle=P.text1; ctx.font=num(e.num); ctx.fillText(c?c.v:"",x,y); }
+  if(c&&c.stack){ // high/low: two lines on ONE right edge, no divider (ClaudeGridSlot stacked branch)
+    const p=c.v.split("/"), fs=Math.round(e.num*0.8), dy=e.num*0.4; ctx.font=num(fs); ctx.fillStyle=P.text1;
+    const wmax=Math.max(ctx.measureText(p[0]).width,ctx.measureText(p[1]||"").width), right=x+wmax/2;
+    ctx.textAlign="right"; ctx.fillText(p[0],right,y-dy); ctx.fillText(p[1]||"",right,y+dy); ctx.textAlign="center"; }
+  else { ctx.fillStyle=P.text1; ctx.font=num(e.num); ctx.fillText(valueOf(e,c),x,y); }
   boxes[k]=[x-46,y-38,x+46,y+38];
 }
-function draw(){ lowPower=document.getElementById("lowp").checked; ctx.fillStyle="#000"; ctx.fillRect(0,0,SZ,SZ); boxes={}; GA=hexRgb(P.grad1); GB=hexRgb(P.grad2); battArc();
-  ["batt","d02","d03","d04","d05","d06","d08","sec","time","date","week","brand","alarmi","swatch"].forEach(drawEl);
+// Same order as ClaudeGridView.onUpdate: arc, slots, time, brand, indicators, THEN the knockout
+// disc (so it cuts only the digits), then dial/date and week on top, and the mesh last of all.
+function knockout(){ const s=P.el.sec; ctx.fillStyle="#000"; ctx.beginPath(); ctx.arc(s.x*SZ,s.y*SZ,s.ring+(s.knock||0),0,2*Math.PI); ctx.fill(); }
+function draw(){ lowPower=document.getElementById("lowp").checked; P.vfd=document.getElementById("vfd").checked; ctx.fillStyle="#000"; ctx.fillRect(0,0,SZ,SZ); boxes={}; GA=hexRgb(P.grad1); GB=hexRgb(P.grad2); battArc();
+  ["batt","d02","d03","d04","d05","d06","d08","time","brand","alarmi","swatch"].forEach(drawEl);
+  knockout();
+  ["sec","date","week"].forEach(drawEl);
+  if(P.vfd && !lowPower) meshOverlay();
   if(sel=="arc"){ const a=P.arc, hs=a.span/2*Math.PI/180; ctx.strokeStyle="#E95625"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.arc(cx,cy,a.rad+5,-Math.PI/2-hs,-Math.PI/2+hs); ctx.stroke(); ctx.beginPath(); ctx.arc(cx,cy,a.rad-a.dashLen-5,-Math.PI/2-hs,-Math.PI/2+hs); ctx.stroke(); ctx.setLineDash([]); }
   else if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#E95625"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
@@ -208,12 +310,32 @@ function hit(mx,my){ let best=null,bd=1e9;
   for(const k in boxes){ if(k=="arc")continue; const b=boxes[k], ix=Math.max(b[0],Math.min(mx,b[2])), iy=Math.max(b[1],Math.min(my,b[3])); const d=(mx-ix)**2+(my-iy)**2; if(d<bd){bd=d;best=k;} } return bd<42*42?best:null; }
 function snapAxis(val,others){ let best=val,g=null,bd=0.014; const t=[0.5].concat(others); for(const o of t){ if(Math.abs(val-o)<bd){ bd=Math.abs(val-o); best=o; g=o*SZ; } } return [best,g]; }
 let drag=null; const cv=document.getElementById("c");
-cv.addEventListener("pointerdown",ev=>{ const r=cv.getBoundingClientRect(), mx=(ev.clientX-r.left)*SZ/r.width, my=(ev.clientY-r.top)*SZ/r.height; const k=hit(mx,my);
+cv.addEventListener("pointerdown",ev=>{ if(document.activeElement&&document.activeElement!==document.body) document.activeElement.blur(); // arrows -> watch, not the last dropdown
+  const r=cv.getBoundingClientRect(), mx=(ev.clientX-r.left)*SZ/r.width, my=(ev.clientY-r.top)*SZ/r.height; const k=hit(mx,my);
   if(k){ sel=k; drag=k; cv.setPointerCapture(ev.pointerId); cv.style.cursor="grabbing"; syncPanel(); draw(); } });
 cv.addEventListener("pointermove",ev=>{ if(!drag)return; const r=cv.getBoundingClientRect(); let nx=Math.max(0.02,Math.min(0.98,(ev.clientX-r.left)/r.width)), ny=Math.max(0.02,Math.min(0.98,(ev.clientY-r.top)/r.height)); guide=null;
   if(document.getElementById("snap").checked && drag!="arc"){ const ox=[],oy=[]; for(const kk in P.el){ if(kk!=drag){ ox.push(P.el[kk].x); oy.push(P.el[kk].y);} } const sx=snapAxis(nx,ox), sy=snapAxis(ny,oy); nx=sx[0]; ny=sy[0]; guide={x:sx[1],y:sy[1]}; }
   if(drag=="arc"){ P.arc.rad=Math.max(120,Math.min(228, cy - ny*SZ)); guide=null; } else if(drag=="week"){ P.el.week.y=ny; } else { P.el[drag].x=nx; P.el[drag].y=ny; mirror(drag); } draw(); });
 cv.addEventListener("pointerup",()=>{ drag=null; guide=null; cv.style.cursor="grab"; draw(); });
+
+// Keyboard nudge: arrows move the selected element 1 px (Shift = 10 px), with the same mirroring
+// as dragging. The battery arc moves radially (Up = toward the bezel), the week strip vertically
+// only - both as when dragged. Ignored while typing in a field, so arrows still work there.
+document.addEventListener("keydown",ev=>{
+  if(!sel) return;
+  const tag=(document.activeElement&&document.activeElement.tagName)||"";
+  if(tag=="INPUT"||tag=="SELECT"||tag=="TEXTAREA") return;
+  const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key];
+  if(!d) return;
+  ev.preventDefault();                       // don't scroll the page
+  const step=ev.shiftKey?10:1;
+  if(sel=="arc"){ if(d[1]) P.arc.rad=Math.max(120,Math.min(228,P.arc.rad-d[1]*step)); syncPanel(); draw(); return; }
+  const e=P.el[sel]; if(!e) return;
+  const clamp=v=>Math.max(0.02,Math.min(0.98,v));
+  if(sel!="week") e.x=clamp(e.x+d[0]*step/SZ);
+  e.y=clamp(e.y+d[1]*step/SZ);
+  mirror(sel); draw();
+});
 
 const compSel=document.getElementById("compSel"); COMPS.forEach((c,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=c.k; compSel.appendChild(o); });
 const fontSel=document.getElementById("fontSel"); FONTS.forEach(f=>{ const o=document.createElement("option"); o.value=f; o.textContent=f; fontSel.appendChild(o); });
@@ -225,6 +347,10 @@ function syncPanel(){ const e=sel&&sel!="arc"?P.el[sel]:null; const isArc=sel=="
   const isData=e&&(e.kind=="chip"||e.kind=="ring"||e.kind=="tick"||e.kind=="horiz");
   const isRing=e&&(e.kind=="ring"||e.kind=="tick");
   show("ctlComp",isData); show("ctlRing",isRing); show("ctlGap",e&&e.kind=="time");
+  show("ctlTick",e&&e.kind=="tick"); show("ctlKnock",e&&e.kind=="tick");
+  show("ctlCity",!!(e&&isData&&COMPS[e.comp]&&COMPS[e.comp].tz));
+  if(e&&e.kind=="tick"){ document.getElementById("tickSel").value=e.tick||"2px"; setR("knockR","knockRV",e.knock||0,0); }
+  if(e&&COMPS[e.comp]&&COMPS[e.comp].tz){ document.getElementById("citySel").value=e.city||"New York"; }
   show("ctlText",e&&e.kind=="brand"); show("ctlFade",e&&e.kind=="time"); show("ctlDGap",e&&e.kind=="date"); show("ctlWeek",e&&e.kind=="week");
   show("ctlArcR",isArc); show("ctlArcSpan",isArc); show("ctlArcW",isArc); show("ctlArcL",isArc);
   show("ctlNum",!!e&&!isArc&&!(e&&e.kind=="ind")); show("ctlSym",isData||(e&&e.kind=="ind"));
@@ -240,7 +366,24 @@ function syncPanel(){ const e=sel&&sel!="arc"?P.el[sel]:null; const isArc=sel=="
 }
 function setR(rid,vid,val,dp){ document.getElementById(rid).value=val; document.getElementById(vid).textContent=dp?(+val).toFixed(dp):(""+Math.round(val)); }
 function linkVal(pid,hid,val){ document.getElementById(pid).value=val; document.getElementById(hid).value=val; }
-compSel.onchange=()=>{ if(sel&&sel!="arc"){P.el[sel].comp=+compSel.value; draw();} };
+compSel.onchange=()=>{ if(sel&&sel!="arc"){P.el[sel].comp=+compSel.value; syncPanel(); draw();} };
+const citySel=document.getElementById("citySel"); CITIES.forEach(c=>{ const o=document.createElement("option"); o.value=c[0]; o.textContent=c[0]; citySel.appendChild(o); });
+citySel.onchange=()=>{ if(sel&&sel!="arc"){ P.el[sel].city=citySel.value; draw(); } };
+document.getElementById("tickSel").onchange=function(){ if(sel=="sec"){ P.el.sec.tick=this.value; draw(); } };
+bindR("knockR","knockRV",0,v=>{ if(sel=="sec") P.el.sec.knock=v; });
+document.getElementById("vfd").onchange=draw;
+// Preview time & date sliders (see PV). Month changes clamp the day to that month's length.
+function syncPV(){ document.getElementById("pvD").max=daysIn(); if(PV.day>daysIn()) PV.day=daysIn();
+  setR("pvH","pvHV",PV.h,0); document.getElementById("pvHV").textContent=HH()+(PV.h24?"":(PV.h<12?"a":"p"));
+  setR("pvM","pvMV",PV.m,0); document.getElementById("pvMV").textContent=MM();
+  setR("pvS","pvSV",PV.s,0); document.getElementById("pvSV").textContent=pad2(PV.s);
+  setR("pvD","pvDV",PV.day,0); setR("pvMo","pvMoV",PV.mon,0); document.getElementById("pvMoV").textContent=MON();
+  document.getElementById("pv24").checked=PV.h24; }
+[["pvH","h"],["pvM","m"],["pvS","s"],["pvD","day"],["pvMo","mon"]].forEach(([id,key])=>{
+  document.getElementById(id).oninput=function(){ PV[key]=+this.value; syncPV(); draw(); }; });
+document.getElementById("pv24").onchange=function(){ PV.h24=this.checked; syncPV(); draw(); };
+document.getElementById("pvNow").onclick=function(){ pvNow(); syncPV(); draw(); };
+syncPV();
 function bindR(rid,vid,dp,fn){ document.getElementById(rid).oninput=function(){ fn(+this.value); if(sel&&sel!="arc") mirror(sel); document.getElementById(vid).textContent=dp?(+this.value).toFixed(dp):(""+Math.round(+this.value)); draw(); }; }
 bindR("ringR","ringRV",0,v=>{if(sel&&sel!="arc")P.el[sel].ring=v;});
 bindR("numR","numRV",0,v=>{if(sel&&sel!="arc")P.el[sel].num=v;});
@@ -259,22 +402,25 @@ function bindColor(pid,hid,set){ const p=document.getElementById(pid), h=documen
 bindColor("cAcc","cAccH",v=>P.accent=v); bindColor("cT1","cT1H",v=>P.text1=v); bindColor("cT2","cT2H",v=>P.text2=v);
 bindColor("cT3","cT3H",v=>P.text3=v); bindColor("cHc","cHcH",v=>P.hourCol=v);
 bindColor("cG1","cG1H",v=>P.grad1=v); bindColor("cG2","cG2H",v=>P.grad2=v);
+bindColor("cHg","cHgH",v=>P.hourGlow=v); bindColor("cMg","cMgH",v=>P.minGlow=v);
 document.getElementById("brandT").oninput=function(){ if(sel=="brand"){ P.el.brand.text=this.value; draw(); } };
 fontSel.onchange=function(){ setFont(this.value); };
 document.getElementById("lowp").onchange=draw;
 function setFont(name){ P.font=name; const id="gf-"+name.replace(/ /g,'-'); if(!document.getElementById(id)){ const l=document.createElement("link"); l.id=id; l.rel="stylesheet"; l.href="https://fonts.googleapis.com/css2?family="+name.replace(/ /g,"+")+"&display=swap"; document.head.appendChild(l); }
   if(document.fonts&&document.fonts.load){ document.fonts.load("40px '"+name+"'").then(function(){draw();setTimeout(draw,150);}).catch(function(){draw();}); } setTimeout(draw,700); setTimeout(draw,1500); }
-function refresh(){ let L=["font: "+P.font,"accent: "+P.accent,"text1: "+P.text1+"  text2: "+P.text2+"  text3: "+P.text3,"hour: "+P.hourCol+"  grad1: "+P.grad1+"  grad2: "+P.grad2,
+function refresh(){ let L=["font: "+P.font,"style: "+(P.vfd?"VFD (glow time + full-face mesh)":"plain"),"glow: hour="+P.hourGlow+"  minute="+P.minGlow,"accent: "+P.accent,"text1: "+P.text1+"  text2: "+P.text2+"  text3: "+P.text3,"hour: "+P.hourCol+"  grad1: "+P.grad1+"  grad2: "+P.grad2,
   "arc: rad="+Math.round(P.arc.rad)+" span="+P.arc.span+" dashW="+P.arc.dashW+" dashLen="+P.arc.dashLen,""];
   for(const k in P.el){ const e=P.el[k]; let s=k.padEnd(6)+" ("+e.name+")  x="+e.x.toFixed(3)+" y="+e.y.toFixed(3);
     if(e.comp!=null) s+="  comp="+COMPS[e.comp].k; if(e.ring!=null) s+="  ring="+Math.round(e.ring)+"px";
     if(e.num!=null) s+="  num="+Math.round(e.num)+"px"; if(e.sym!=null) s+="  sym="+Math.round(e.sym)+"px";
     if(e.gap!=null) s+="  gap="+Math.round(e.gap)+"px";
-    if(e.span!=null) s+="  width="+e.span; if(e.fade!=null) s+="  fade="+(+e.fade).toFixed(2); if(e.text!=null) s+="  text=\""+e.text+"\""; L.push(s); }
+    if(e.span!=null) s+="  width="+e.span; if(e.fade!=null) s+="  fade="+(+e.fade).toFixed(2); if(e.text!=null) s+="  text=\""+e.text+"\"";
+    if(e.tick!=null) s+="  ticks="+e.tick; if(e.knock!=null) s+="  knockout="+e.knock+"px";
+    if(e.city!=null && e.comp!=null && COMPS[e.comp].tz) s+="  city="+e.city; L.push(s); }
   out.value=L.join("\n"); }
-function linkAllColours(){ linkVal("cAcc","cAccH",P.accent); linkVal("cT1","cT1H",P.text1); linkVal("cT2","cT2H",P.text2); linkVal("cT3","cT3H",P.text3); linkVal("cHc","cHcH",P.hourCol); linkVal("cG1","cG1H",P.grad1); linkVal("cG2","cG2H",P.grad2); }
+function linkAllColours(){ linkVal("cHg","cHgH",P.hourGlow); linkVal("cMg","cMgH",P.minGlow); linkVal("cAcc","cAccH",P.accent); linkVal("cT1","cT1H",P.text1); linkVal("cT2","cT2H",P.text2); linkVal("cT3","cT3H",P.text3); linkVal("cHc","cHcH",P.hourCol); linkVal("cG1","cG1H",P.grad1); linkVal("cG2","cG2H",P.grad2); }
 function copyOut(){ out.select(); document.execCommand("copy"); }
-function reset(){ P=defaults(); sel=null; guide=null; document.getElementById("fontSel").value=P.font; linkAllColours(); syncPanel(); setFont(P.font); }
+function reset(){ P=defaults(); sel=null; guide=null; document.getElementById("vfd").checked=P.vfd; document.getElementById("fontSel").value=P.font; linkAllColours(); syncPanel(); setFont(P.font); }
 linkAllColours();
 document.getElementById("fontSel").value=P.font; syncPanel(); setFont(P.font);
 </script></body></html>"""

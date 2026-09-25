@@ -1,0 +1,26 @@
+<settings>
+    <!-- Garmin Connect (phone) settings. The same two properties are editable on the watch through
+         ClaudeGridSettingsMenu. List values index AltTz.LAT/LON/NAMES. -->
+    <setting propertyKey="@Properties.AltTzCity" title="@Strings.altTzCityTitle">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.tzNewYork</listEntry>
+            <listEntry value="1">@Strings.tzChicago</listEntry>
+            <listEntry value="2">@Strings.tzLosAngeles</listEntry>
+            <listEntry value="3">@Strings.tzLondon</listEntry>
+            <listEntry value="4">@Strings.tzParis</listEntry>
+            <listEntry value="5">@Strings.tzZurich</listEntry>
+            <listEntry value="6">@Strings.tzDubai</listEntry>
+            <listEntry value="7">@Strings.tzMumbai</listEntry>
+            <listEntry value="8">@Strings.tzSingapore</listEntry>
+            <listEntry value="9">@Strings.tzHongKong</listEntry>
+            <listEntry value="10">@Strings.tzShanghai</listEntry>
+            <listEntry value="11">@Strings.tzTokyo</listEntry>
+            <listEntry value="12">@Strings.tzSydney</listEntry>
+            <listEntry value="13">@Strings.tzAuckland</listEntry>
+            <listEntry value="14">@Strings.tzUtc</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.AltTzAlways" title="@Strings.altTzAlwaysLong">
+        <settingConfig type="boolean" />
+    </setting>
+</settings>

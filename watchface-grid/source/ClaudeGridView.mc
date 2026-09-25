@@ -19,7 +19,9 @@ import Toybox.Weather;
 //!
 //! Six of the fields (Data 01-06) are complication slots configured with Garmin's native on-device
 //! editor; the assigned complication's icon + value are drawn at the slot, and the two ring slots
-//! (04/05) also gauge it. The seconds dial (Data 07) and the alt-time-zone (Data 08) are fixed.
+//! (04/05) also gauge it. The seconds dial (Data 07) is fixed. Data 08 is editable too, but until a
+//! complication is picked for it (or when forced by the AltTzAlways setting) it shows a second time
+//! zone, whose city is a setting (on-watch menu or Garmin Connect).
 //! Accent and data colours are editable natively; the rest of the palette is baked from the editor.
 class ClaudeGridView extends WatchUi.WatchFace {
 
@@ -31,6 +33,8 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private const _DEFAULT_DATA = 0xFF9C75;      // chip values (Text 1)
 
     private const TIME_GAP = 56;                 // HH / MM each this far from the vertical centre
+    private const DIAL_R = 50;                   // seconds-dial tick outer radius (= tick font R_OUT)
+    private const DIAL_CLEAR_R = 55;             // knockout disc: DIAL_R + a 5 px black gap
 
     private var _fTime as Graphics.FontType?;    // 139px digits  - the clock
     private var _fTimeO as Graphics.FontType?;   // 139px outline - always-on clock
@@ -38,13 +42,18 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private var _fMed as Graphics.FontType?;     // 30px          - chip values, alt-tz, seconds
     private var _fWeek as Graphics.FontType?;    // 27px          - weekday letters
     private var _fSmall as Graphics.FontType?;   // 24px          - battery %, SEC, text labels
+    private var _fTiny as Graphics.FontType?;    // 20px          - last-resort value font (corners)
     private var _fIcon as Graphics.FontType?;    // 24px          - Tabler per-field icons
+    private var _fTicks as Graphics.FontType?;   // seconds-dial ticks (pre-rasterised, cg_ticks)
     private var _fWeekVec as Graphics.VectorFont?; // vector font  - weekday strip (rotatable)
 
     private var _editMode as Boolean = false;
     private var _lowPower as Boolean = false;    // always-on / ambient mode
     private var _accentColor as Number = _DEFAULT_ACCENT;
     private var _dataColor as Number = _DEFAULT_DATA;
+
+    private var _altIndex as Number = 0;         // Data 08 time-zone city (AltTz index)
+    private var _altAlways as Boolean = false;   // Data 08 shows the clock even if a comp is picked
 
     private var _alarmChar as String = "";       // Tabler alarm glyph
     private var _worldChar as String = "";       // Tabler globe glyph (alt time zone)
@@ -74,7 +83,9 @@ class ClaudeGridView extends WatchUi.WatchFace {
         _fMed   = WatchUi.loadResource(Rez.Fonts.CGMed) as Graphics.FontType;
         _fWeek  = WatchUi.loadResource(Rez.Fonts.CGWeek) as Graphics.FontType;
         _fSmall = WatchUi.loadResource(Rez.Fonts.CGSmall) as Graphics.FontType;
+        _fTiny  = WatchUi.loadResource(Rez.Fonts.CGTiny) as Graphics.FontType;
         _fIcon  = WatchUi.loadResource(Rez.Fonts.TablerIcon) as Graphics.FontType;
+        _fTicks = WatchUi.loadResource(Rez.Fonts.CGTicks) as Graphics.FontType;
 
         // A vector font for the weekday strip - the only way to draw ROTATED (curved) text on
         // CIQ; bitmap fonts can't rotate. Guarded so older devices fall back to upright letters.
@@ -85,6 +96,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
         }
 
         buildSlots(dc.getWidth(), dc.getHeight());
+        readSettings();
 
         for (var i = 0; i < _slots.size(); i++) {
             updateSlotText(_slots[i].uid);
@@ -118,7 +130,10 @@ class ClaudeGridView extends WatchUi.WatchFace {
             [3, SlotKind.CHIP, 0.834, 0.299, 0,     0, false, Complications.COMPLICATION_TYPE_STEPS],
             [4, SlotKind.RING, 0.135, 0.500, ringR, 6, false, Complications.COMPLICATION_TYPE_HEART_RATE],
             [5, SlotKind.RING, 0.865, 0.500, ringR, 6, false, Complications.COMPLICATION_TYPE_BODY_BATTERY],
-            [6, SlotKind.CHIP, 0.166, 0.724, 0,     0, false, Complications.COMPLICATION_TYPE_CURRENT_WEATHER]
+            [6, SlotKind.CHIP, 0.166, 0.724, 0,     0, false, Complications.COMPLICATION_TYPE_CURRENT_WEATHER],
+            // Data 08: NO seeded default - while nothing is picked it shows the time-zone clock
+            // (see refreshAltTz). Same centre the fixed alt-tz field used, so the look is unchanged.
+            [8, SlotKind.CHIP, 0.834, 0.724, 0,     0, false, null]
         ];
 
         _slots = [];
@@ -139,9 +154,13 @@ class ClaudeGridView extends WatchUi.WatchFace {
             var near = (slotX <= cxf) ? (slotX - (cxf - chordHalf)) : ((cxf + chordHalf) - slotX);
             var maxW = isRing ? ((s[4] as Number) * 1.6).toNumber() : (2.0 * (near - 8)).toNumber();
             if (maxW < 40) { maxW = 40; }
+            // Data 01 sits INSIDE the battery arc, whose dashes (inner radius ~209 px) close in
+            // to ~180 px wide at the text's top edge - narrower than the bezel chord above.
+            if (isHoriz && maxW > 180) { maxW = 180; }
 
-            var valueFonts = isRing ? [_fBig, _fMed]
-                                    : (isHoriz ? [_fSmall] : [_fMed, _fSmall]);
+            // Largest -> smallest; the slot picks the first that fits the row (ClaudeGridSlot).
+            var valueFonts = isRing ? [_fBig, _fMed, _fSmall]
+                                    : (isHoriz ? [_fSmall, _fTiny] : [_fMed, _fSmall, _fTiny]);
             var slot = new ClaudeGridSlot({
                 :uid => uid,
                 :kind => s[1],
@@ -155,12 +174,16 @@ class ClaudeGridView extends WatchUi.WatchFace {
                 :fIcon => _fIcon,
                 :valueFonts => valueFonts,
                 :fStacked => _fSmall,
-                :valueMaxW => maxW
+                :valueMaxW => maxW,
+                // lets the slot fit each text row to the round screen at that row's height
+                :screen => [w / 2, h / 2, w / 2]
             });
             slot.labelColor = TEXT3;
             slot.valueColor = isRing ? TEXT2 : _dataColor;   // rings=white, chips=Text 1
             _slots.add(slot);
-            _slotIds[uid] = new Complications.Id(s[7] as Complications.Type);
+            if (s[7] != null) {
+                _slotIds[uid] = new Complications.Id(s[7] as Complications.Type);
+            }
         }
     }
 
@@ -193,27 +216,51 @@ class ClaudeGridView extends WatchUi.WatchFace {
                 && (raw > 2000)) {
                 raw = (raw / 100.0 + 0.5).toNumber();
             }
-            var vs = valStr(raw);
+            // The bitmap fonts carry UPPERCASE only - a lowercase value ("Fri", "Sep 25") drew
+            // tofu boxes - so every value is upper-cased before it reaches a font.
+            var vs = valStr(raw).toUpper();
             if ((c.value != null) && (isPercentUsage(t, c.longLabel)
                     || (t == Complications.COMPLICATION_TYPE_BATTERY))) {
                 vs = vs + "%";
             }
             slot.valueTop = "";
             slot.valueBot = "";
+
+            if (t == Complications.COMPLICATION_TYPE_WEEKDAY_MONTHDAY
+                    || t == Complications.COMPLICATION_TYPE_DATE) {
+                // Self-explanatory text: no icon, no label, just the value.
+                slot.iconChar = "";
+                slot.label = "";
+            } else if (t == Complications.COMPLICATION_TYPE_SUNRISE
+                    || t == Complications.COMPLICATION_TYPE_SUNSET) {
+                // Arrives as seconds since local midnight (e.g. 65889 = 18:18:09).
+                vs = clockFromSeconds(raw, vs);
+            } else if (t == Complications.COMPLICATION_TYPE_CURRENT_WEATHER) {
+                // The complication's value is the CONDITION code (1 = partly cloudy), not the
+                // temperature. Draw the live temperature with an icon for the actual condition.
+                var w = currentWeather();
+                slot.iconChar = w[0];
+                vs = w[1];
+            } else if (t == Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE) {
+                vs = withDegree(vs);
+            } else if (t == Complications.COMPLICATION_TYPE_TRAINING_STATUS) {
+                vs = trainingCode(vs);
+            }
+
             if (t == Complications.COMPLICATION_TYPE_HIGH_LOW_TEMPERATURE) {
                 var parts = splitTwo(vs);
                 if (parts != null) {
-                    slot.valueTop = parts[0];
-                    slot.valueBot = parts[1];
+                    slot.valueTop = withDegree(parts[0]);
+                    slot.valueBot = withDegree(parts[1]);
                     slot.value = "";
                 } else {
-                    slot.value = vs;
+                    slot.value = withDegree(vs);
                 }
             } else {
                 slot.value = vs;
             }
             if (slot.kind == SlotKind.RING) {
-                slot.frac = ringFrac(cid, c.value);
+                slot.frac = ringFrac(cid, c.value, c.longLabel);
             }
         } catch (e) {
             slot.label = defaultLabel(uid);
@@ -301,7 +348,9 @@ class ClaudeGridView extends WatchUi.WatchFace {
         // the system battery when Data 01 isn't a 0-100 metric. Sweeps in with the rings on wake.
         GridDraw.segmentArc(dc, cx, cy, cx - 3, 122.5, 57.5, 16, battArcFrac() * ringSweep, 10, 15);
 
-        // The six editable slots (skip the one the editor is currently pulsing).
+        // The seven editable slots (skip the one the editor is currently pulsing). Data 08 is
+        // re-filled with the time-zone clock first when that's what it should show.
+        refreshAltTz();
         for (var i = 0; i < _slots.size(); i++) {
             var slot = _slots[i];
             slot.sweep = ringSweep;
@@ -313,16 +362,50 @@ class ClaudeGridView extends WatchUi.WatchFace {
         drawTime(dc, cx, cy);
         drawBrand(dc, cx, (h * 0.169).toNumber());
         drawIndicators(dc, w, h);
-        drawAltTz(dc, (w * 0.834).toNumber(), (h * 0.724).toNumber());
 
         var dialY = (h * 0.832).toNumber();
+        // Iron Grit knockout: clear a black disc around the seconds dial (and, in always-on, the
+        // stacked date that replaces it) so it cuts into the bottom of the minute digits with a
+        // clean gap, instead of the digits running under the ticks. Drawn after the time and
+        // before the dial/date, so only what's already on screen (the digits) is cut.
+        knockDial(dc, cx, dialY);
         if (_lowPower) {
             drawDateCollapsed(dc, cx, dialY);
         } else {
-            drawSeconds(dc, cx, dialY, 50);
+            drawSeconds(dc, cx, dialY, DIAL_R);
             drawDate(dc, cx, dialY);
         }
         drawWeekCurved(dc, cx, cy, (h * 0.980).toNumber() - cy);
+
+        // Full-face VFD mesh, LAST so it lies over every lit pixel (time, text, icons, rings, arc).
+        // Skipped in always-on: the thin outline time + collapsed date would break up under it.
+        if (!_lowPower) { drawMeshOverlay(dc, w, h); }
+    }
+
+    //! VFD build: tile the generated mesh (black grid lines at partial alpha) over the whole face.
+    //! Tiles start at the screen origin and the tile size is a multiple of the 3 px pitch, so the
+    //! grid is one continuous screen-aligned lattice - same phase on every element. Kept in the
+    //! graphics pool after the first load.
+    (:mesh_overlay)
+    private var _meshTile = null;
+
+    (:mesh_overlay)
+    private function drawMeshOverlay(dc as Dc, w as Number, h as Number) as Void {
+        if (_meshTile == null) {
+            _meshTile = WatchUi.loadResource(Rez.Drawables.MeshTile);
+        }
+        var t = (_meshTile as Graphics.BitmapReference).getWidth();
+        if (t <= 0) { return; }
+        for (var y = 0; y < h; y += t) {
+            for (var x = 0; x < w; x += t) {
+                dc.drawBitmap(x, y, _meshTile);
+            }
+        }
+    }
+
+    //! Normal build: no mesh.
+    (:plain_overlay)
+    private function drawMeshOverlay(dc as Dc, w as Number, h as Number) as Void {
     }
 
     //! Stacked hours over minutes (no colon). Hour is solid; minute is a vertical Gradient 1->2.
@@ -334,13 +417,37 @@ class ClaudeGridView extends WatchUi.WatchFace {
             hour = hour % 12;
             if (hour == 0) { hour = 12; }
         }
+        // Glow builds draw the high-power time from pre-rendered bitmaps; always-on keeps the thin
+        // outline font below (a lit bloom would defeat the AMOLED burn-in budget).
+        if (!_lowPower && _fTime != null
+                && drawGlowTime(dc, tx, cy, hour.format("%02d"), clock.min.format("%02d"))) {
+            return;
+        }
         var tf = _lowPower ? ((_fTimeO != null) ? _fTimeO : _fTime) : _fTime;
         if (tf == null) { tf = Graphics.FONT_NUMBER_THAI_HOT; }
         dc.setColor(HOUR_COL, Graphics.COLOR_TRANSPARENT);
-        dc.drawText(tx, cy - TIME_GAP, tf, hour.format("%02d"),
+        GridDraw.text(dc, tx, cy - TIME_GAP, tf, hour.format("%02d"),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         drawGradientText(dc, tx, cy + TIME_GAP, tf, clock.min.format("%02d"),
             GridDraw.GRAD_A, GridDraw.GRAD_B);
+    }
+
+    //! Bitmap time (option 4 - glow digits). Only compiled into the glow variants, which add
+    //! source-glow/ + a resources-glow*/ folder and exclude the `font_time` annotation instead.
+    (:glow_time)
+    private function drawGlowTime(dc as Dc, tx as Numeric, cy as Numeric, hh as String,
+                                  mm as String) as Boolean {
+        var f = _fTime as Graphics.FontType;
+        GlowTime.drawRow(dc, GridDraw.px(tx), GridDraw.px(cy) - TIME_GAP, f, hh, 0);
+        GlowTime.drawRow(dc, GridDraw.px(tx), GridDraw.px(cy) + TIME_GAP, f, mm, 10);
+        return true;
+    }
+
+    //! Normal build: no bitmap digits, so the caller falls through to the font path.
+    (:font_time)
+    private function drawGlowTime(dc as Dc, tx as Numeric, cy as Numeric, hh as String,
+                                  mm as String) as Boolean {
+        return false;
     }
 
     //! Draw `text` centred at (x, yc) with a top->bottom colour gradient, by re-drawing it inside
@@ -363,7 +470,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
             else { t = (f - lo) / (hi - lo); }
             dc.setClip(x - halfW, topF.toNumber(), 2 * halfW, (bandH + 2).toNumber());
             dc.setColor(GridDraw.lerp(cTop, cBot, t), Graphics.COLOR_TRANSPARENT);
-            dc.drawText(x, yc, font, text,
+            GridDraw.text(dc, x, yc, font, text,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
         dc.clearClip();
@@ -372,7 +479,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private function drawBrand(dc as Dc, cx as Numeric, y as Numeric) as Void {
         dc.setColor(TEXT3, Graphics.COLOR_TRANSPARENT);
         var f = (_fBig != null) ? _fBig : Graphics.FONT_TINY;
-        dc.drawText(cx, y, f, "TACTIX",
+        GridDraw.text(dc, cx, y, f, "TACTIX",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -383,50 +490,66 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var ds = System.getDeviceSettings();
         if (ds.alarmCount != null && ds.alarmCount > 0) {
             dc.setColor(TEXT3, Graphics.COLOR_TRANSPARENT);
-            dc.drawText((w * 0.166).toNumber(), (h * 0.169).toNumber(), _fIcon, _alarmChar,
+            GridDraw.text(dc, (w * 0.166).toNumber(), (h * 0.169).toNumber(), _fIcon, _alarmChar,
                 Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         }
     }
 
-    //! Data 08: a second time zone (New York), globe icon over HH:MM. LocalMoment handles DST from
-    //! the coordinates, so this stays correct year-round without an offset to maintain.
-    private function drawAltTz(dc as Dc, x as Numeric, y as Numeric) as Void {
-        if (_fIcon != null) {
-            dc.setColor(TEXT3, Graphics.COLOR_TRANSPARENT);
-            dc.drawText(x, y - 28, _fIcon, _worldChar,
-                Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
+    // ---- Data 08: editable slot that defaults to a second time zone ----
+
+    //! Re-read the Data 08 settings (city + "always the clock"). Called on layout, on show, and by
+    //! ClaudeGridApp.onSettingsChanged after a Garmin Connect save.
+    public function readSettings() as Void {
+        _altIndex = GridSettings.cityIndex();
+        _altAlways = GridSettings.readAlways();
+        // Leaving clock mode with a complication already picked: repopulate its icon/value now,
+        // rather than waiting for its next change callback.
+        if (!altTzActive() && _slotIds[8] != null) {
+            updateSlotText(8);
         }
-        dc.setColor(_dataColor, Graphics.COLOR_TRANSPARENT);
-        var f = (_fMed != null) ? _fMed : Graphics.FONT_TINY;
-        dc.drawText(x, y, f, altTimeStr(),
-            Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
-    private function altTimeStr() as String {
-        try {
-            var loc = new Position.Location({
-                :latitude => 40.7128, :longitude => -74.0060, :format => :degrees
-            });
-            var lm = Gregorian.localMoment(loc, Time.now());
-            if (lm == null) { return "--:--"; }
-            var info = Gregorian.info(lm, Time.FORMAT_SHORT);
-            return info.hour.format("%02d") + ":" + info.min.format("%02d");
-        } catch (ex) {
-            return "--:--";
+    //! The clock shows when forced by the setting, or while no complication is picked for Data 08.
+    private function altTzActive() as Boolean {
+        return _altAlways || (_slotIds[8] == null);
+    }
+
+    //! Put the time-zone clock into the Data 08 slot (globe icon over HH:MM in the 30px font), or
+    //! hand the slot back to auto-fit when a picked complication owns it. Because the clock lives
+    //! IN the slot, the editor can select, pulse and reassign Data 08 like any other field.
+    private function refreshAltTz() as Void {
+        var slot = slotFor(8);
+        if (slot == null) { return; }
+        if (altTzActive()) {
+            slot.iconChar = _worldChar;
+            slot.label = "";
+            slot.valueTop = "";
+            slot.valueBot = "";
+            slot.value = AltTz.timeStr(_altIndex);
+            slot.forceFont = _fMed;
+        } else {
+            slot.forceFont = null;
         }
+    }
+
+    //! Clear the dial's knockout disc to black (see onUpdate). Anti-aliased, so the cut edge
+    //! through the minute digits is a smooth arc.
+    private function knockDial(dc as Dc, cx as Numeric, cy as Numeric) as Void {
+        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
+        dc.fillCircle(cx, cy, DIAL_CLEAR_R);
     }
 
     //! Data 07: the fixed live seconds dial (60-tick gradient ring), not an editable slot.
     private function drawSeconds(dc as Dc, cx as Numeric, cy as Numeric, r as Numeric) as Void {
         var sec = System.getClockTime().sec;
-        GridDraw.tickRing(dc, cx, cy, r, (sec / 60.0) * ringSweep);
+        GridDraw.tickRing(dc, cx, cy, r, (sec / 60.0) * ringSweep, _fTicks);
         dc.setColor(TEXT3, Graphics.COLOR_TRANSPARENT);
         var sf = (_fSmall != null) ? _fSmall : Graphics.FONT_XTINY;
-        dc.drawText(cx, cy - 24, sf, "SEC",
+        GridDraw.text(dc, cx, cy - 24, sf, "SEC",
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
         dc.setColor(_accentColor, Graphics.COLOR_TRANSPARENT);
         var vf = (_fMed != null) ? _fMed : Graphics.FONT_MEDIUM;
-        dc.drawText(cx, cy + 11, vf, sec.format("%02d"),
+        GridDraw.text(dc, cx, cy + 11, vf, sec.format("%02d"),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -435,9 +558,9 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         dc.setColor(TEXT2, Graphics.COLOR_TRANSPARENT);
         var f = (_fBig != null) ? _fBig : Graphics.FONT_TINY;
-        dc.drawText(cx - 81, y, f, (info.month as String).toUpper(),
+        GridDraw.text(dc, cx - 81, y, f, (info.month as String).toUpper(),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx + 81, y, f, info.day.format("%d"),
+        GridDraw.text(dc, cx + 81, y, f, info.day.format("%d"),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -446,9 +569,9 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         dc.setColor(TEXT2, Graphics.COLOR_TRANSPARENT);
         var f = (_fMed != null) ? _fMed : Graphics.FONT_TINY;
-        dc.drawText(cx, y - 16, f, info.day.format("%d"),
+        GridDraw.text(dc, cx, y - 16, f, info.day.format("%d"),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
-        dc.drawText(cx, y + 16, f, (info.month as String).toUpper(),
+        GridDraw.text(dc, cx, y + 16, f, (info.month as String).toUpper(),
             Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
     }
 
@@ -462,8 +585,8 @@ class ClaudeGridView extends WatchUi.WatchFace {
         for (var i = 0; i < 7; i++) {
             var aDeg = 244.0 + (52.0 / 6.0) * i;              // math degrees, 270 = bottom
             var a = aDeg * Math.PI / 180.0;
-            var x = cx + r * Math.cos(a);
-            var y = cy - r * Math.sin(a);
+            var x = GridDraw.px(cx + r * Math.cos(a));   // whole-pixel anchor (see GridDraw.text)
+            var y = GridDraw.px(cy - r * Math.sin(a));
             dc.setColor((i == today - 1) ? _accentColor : TEXT3, Graphics.COLOR_TRANSPARENT);
             if (_fWeekVec != null) {
                 // NOTE: on the real tactix 8, drawAngledText rotates OPPOSITE to the simulator;
@@ -471,7 +594,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
                 dc.drawAngledText(x, y, _fWeekVec, letters[i],
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER, aDeg - 270.0);
             } else {
-                dc.drawText(x, y, wf, letters[i],
+                GridDraw.text(dc, x, y, wf, letters[i],
                     Graphics.TEXT_JUSTIFY_CENTER | Graphics.TEXT_JUSTIFY_VCENTER);
             }
         }
@@ -486,12 +609,13 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (dc has :setAntiAlias) { dc.setAntiAlias(true); }
         var scx = w / 2;
         var scy = (h * 0.832).toNumber();
-        var r = 50;
-        var pad = r + 10;
+        var pad = DIAL_CLEAR_R + 1;
         dc.setClip(scx - pad, scy - pad, 2 * pad, 2 * pad);
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
-        dc.clear();
-        drawSeconds(dc, scx, scy, r);
+        // Clear only the knockout DISC, not the whole clip square: the square's corners hold
+        // minute-digit pixels outside the disc, which must survive a seconds-only refresh.
+        knockDial(dc, scx, scy);
+        drawSeconds(dc, scx, scy, DIAL_R);
+        drawMeshOverlay(dc, w, h);   // clipped to the dial, so only its tiles' overlap is touched
         dc.clearClip();
     }
 
@@ -515,6 +639,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
     }
 
     public function onShow() as Void {
+        readSettings();   // an on-watch settings edit lands here when the face comes back
         _lowPower = false;
         startSweep();
     }
@@ -540,9 +665,11 @@ class ClaudeGridView extends WatchUi.WatchFace {
         var id = _slotIds[1];
         if (id != null) {
             var cid = id as Complications.Id;
-            if (isPercentMetric(cid.getType())) {
+            var comp = null;
+            try { comp = Complications.getComplication(cid); } catch (e) {}
+            if (comp != null && isPercentMetric(cid.getType(), comp.longLabel)) {
                 try {
-                    var v = Complications.getComplication(cid).value;
+                    var v = comp.value;
                     if (v instanceof Lang.Number || v instanceof Lang.Float
                         || v instanceof Lang.Double || v instanceof Lang.Long) {
                         var f = v.toFloat() / 100.0;
@@ -557,24 +684,27 @@ class ClaudeGridView extends WatchUi.WatchFace {
         return System.getSystemStats().battery / 100.0;
     }
 
+    //! Our own Claude usage meters. They are Connect IQ complications (type INVALID), but so is
+    //! every other third-party one (e.g. Quote Glance), so INVALID alone must NOT mean "a Claude
+    //! percentage" - the long label is what identifies ours ("Claude 5-hour usage", ...).
+    private function isClaudeMeter(longLabel as String or Null) as Boolean {
+        return (longLabel != null) && ((longLabel as String).find("Claude") != null);
+    }
+
     //! Types whose value is a 0-100 percentage, so the arc can gauge them directly.
-    private function isPercentMetric(t as Complications.Type or Null) as Boolean {
+    private function isPercentMetric(t as Complications.Type or Null, longLabel as String or Null) as Boolean {
         return t == Complications.COMPLICATION_TYPE_BATTERY
             || t == Complications.COMPLICATION_TYPE_BODY_BATTERY
             || t == Complications.COMPLICATION_TYPE_PULSE_OX
             || t == Complications.COMPLICATION_TYPE_STRESS
             || t == Complications.COMPLICATION_TYPE_SLEEP_SCORE
-            || t == Complications.COMPLICATION_TYPE_INVALID;  // Claude usage meters (Fable/5h/1w)
+            || (t == Complications.COMPLICATION_TYPE_INVALID && isClaudeMeter(longLabel));
     }
 
-    private function ringFrac(id as Complications.Id, v as Complications.Value or Null) as Float {
+    private function ringFrac(id as Complications.Id, v as Complications.Value or Null,
+                              longLabel as String or Null) as Float {
         var t = id.getType();
-        if (v != null && (t == Complications.COMPLICATION_TYPE_BODY_BATTERY
-                       || t == Complications.COMPLICATION_TYPE_BATTERY
-                       || t == Complications.COMPLICATION_TYPE_PULSE_OX
-                       || t == Complications.COMPLICATION_TYPE_STRESS
-                       || t == Complications.COMPLICATION_TYPE_SLEEP_SCORE
-                       || t == Complications.COMPLICATION_TYPE_INVALID)) {  // Claude % meters
+        if (v != null && isPercentMetric(t, longLabel)) {
             var f = 0.0;
             if (v instanceof Lang.Float || v instanceof Lang.Double) {
                 f = v.toFloat() / 100.0;
@@ -588,25 +718,114 @@ class ClaudeGridView extends WatchUi.WatchFace {
         return 0.66;
     }
 
+    //! Claude usage meters get a "%" suffix (their value is a bare 0-100 number).
     private function isPercentUsage(t as Complications.Type or Null, longLabel as String or Null) as Boolean {
-        if (t == Complications.COMPLICATION_TYPE_INVALID) { return true; }
-        if (longLabel != null) {
-            var s = longLabel as String;
-            if ((s.find("Claude") != null) || (s.find("usage") != null)) { return true; }
-        }
-        return false;
+        return (t == Complications.COMPLICATION_TYPE_INVALID) && isClaudeMeter(longLabel);
     }
 
+    //! Split "29°/27°" (or "29° / 27°", "29 27") into its two readings, with ALL spaces removed:
+    //! a stray space left on either side of the "/" is what staggered the stacked high/low lines.
     private function splitTwo(s as String) as Array<String>? {
         var sep = s.find("/");
         if (sep == null) { sep = s.find(" "); }
         if (sep == null) { return null; }
         var a = s.substring(0, sep);
         var b = s.substring(sep + 1, s.length());
-        if ((a == null) || (b == null) || (a.length() == 0) || (b.length() == 0)) {
+        if ((a == null) || (b == null)) { return null; }
+        a = noSpaces(a);
+        b = noSpaces(b);
+        if ((a.length() == 0) || (b.length() == 0)) {
             return null;
         }
         return [a, b];
+    }
+
+    private function noSpaces(s as String) as String {
+        var chars = s.toCharArray();
+        var out = "";
+        for (var i = 0; i < chars.size(); i++) {
+            if (chars[i] != ' ') { out += chars[i].toString(); }
+        }
+        return out;
+    }
+
+    //! Seconds since local midnight -> "HH:MM" (24 h) or "H:MM" (12 h). `fallback` is returned
+    //! unchanged when the value isn't numeric (e.g. a firmware that already sends a string).
+    private function clockFromSeconds(v as Complications.Value or Null, fallback as String) as String {
+        if (!(v instanceof Lang.Number || v instanceof Lang.Float
+              || v instanceof Lang.Double || v instanceof Lang.Long)) {
+            return fallback;
+        }
+        var secs = v.toNumber();
+        if (secs < 0) { return fallback; }
+        var h = (secs / 3600) % 24;
+        var m = (secs % 3600) / 60;
+        if (System.getDeviceSettings().is24Hour) {
+            return h.format("%02d") + ":" + m.format("%02d");
+        }
+        var h12 = h % 12;
+        if (h12 == 0) { h12 = 12; }
+        return h12.format("%d") + ":" + m.format("%02d");
+    }
+
+    //! Training status as a fixed short code (a corner fits ~6 characters; the full words are
+    //! 7-12). Matched by keyword on the upper-cased value, UNPRODUCTIVE before PRODUCTIVE since it
+    //! contains it. Anything unrecognised passes through unchanged (the slot then fits it).
+    private function trainingCode(s as String) as String {
+        if (s.find("UNPROD") != null) { return "UNPROD"; }
+        if (s.find("PRODUCT") != null) { return "PROD"; }
+        if (s.find("MAINTAIN") != null) { return "MAINT"; }
+        if (s.find("RECOVER") != null) { return "RECOV"; }
+        if (s.find("DETRAIN") != null) { return "DETRN"; }
+        if (s.find("OVERREACH") != null) { return "OVRRCH"; }
+        if (s.find("PEAK") != null) { return "PEAK"; }
+        if (s.find("STRAIN") != null) { return "STRAIN"; }
+        if (s.find("NO STATUS") != null || s.find("NONE") != null) { return "--"; }
+        return s;
+    }
+
+    //! Append the degree sign to a numeric reading (idempotent: an existing ° is not doubled).
+    private function withDegree(s as String) as String {
+        if (s.equals("") || s.equals("--") || s.find("°") != null) { return s; }
+        return s + "°";
+    }
+
+    //! [icon, value] for current weather, straight from Weather.getCurrentConditions(): the live
+    //! temperature (converted to the watch's unit) and an icon for the actual condition, sun or
+    //! moon variant by whether it's currently between sunrise and sunset at that location.
+    private function currentWeather() as Array<String> {
+        try {
+            var cc = Weather.getCurrentConditions();
+            if (cc == null) { return ["", "--"]; }
+            var val = "--";
+            var tc = cc.temperature;
+            if (tc != null) {
+                var tv = tc.toFloat();
+                if (System.getDeviceSettings().temperatureUnits == System.UNIT_STATUTE) {
+                    tv = tv * 9.0 / 5.0 + 32.0;
+                }
+                val = Math.round(tv).toNumber().format("%d") + "°";
+            }
+            var icon = "";
+            if (cc.condition != null) {
+                icon = weatherGlyph(cc.condition as Number, isNight(cc)).toChar().toString();
+            }
+            return [icon, val];
+        } catch (ex) {
+            return ["", "--"];
+        }
+    }
+
+    //! True between local sunset and the next sunrise at the observation location. Unknown
+    //! location or sun times -> daytime (the sun icons are the safer default).
+    private function isNight(cc as Weather.CurrentConditions) as Boolean {
+        var loc = cc.observationLocationPosition;
+        if (loc == null) { return false; }
+        var now = Time.now();
+        var rise = Weather.getSunrise(loc, now);
+        var set = Weather.getSunset(loc, now);
+        if (rise == null || set == null) { return false; }
+        return now.lessThan(rise) || now.greaterThan(set);
     }
 
     private function valStr(v as Complications.Value or Null) as String {
@@ -623,6 +842,7 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (uid == 3) { return "ST"; }
         if (uid == 4) { return "HR"; }
         if (uid == 5) { return "BB"; }
+        if (uid == 8) { return "TZ"; }
         return "WX";
     }
 
@@ -638,7 +858,8 @@ class ClaudeGridView extends WatchUi.WatchFace {
     private function iconCodeFor(t as Complications.Type or Null) as Number {
         if (t == null) { return 0; }
         if (t == Complications.COMPLICATION_TYPE_BATTERY) { return 0xea34; }
-        if (t == Complications.COMPLICATION_TYPE_STEPS) { return 0x10265; }
+        // footprints: re-filed from U+10265 to 0xE000 in cg_icon (CIQ glyph codes are 16-bit)
+        if (t == Complications.COMPLICATION_TYPE_STEPS) { return 0xE000; }
         if (t == Complications.COMPLICATION_TYPE_HEART_RATE) { return 0xef92; }
         if (t == Complications.COMPLICATION_TYPE_BODY_BATTERY) { return 0xea38; }
         if (t == Complications.COMPLICATION_TYPE_CALORIES) { return 0xec2c; }
@@ -653,28 +874,34 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (t == Complications.COMPLICATION_TYPE_CURRENT_WEATHER
          || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_1DAY
          || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_2DAY
-         || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_3DAY) { return weatherCode(); }
+         || t == Complications.COMPLICATION_TYPE_FORECAST_WEATHER_3DAY) {
+            // Current weather's icon is set live in updateSlotText. Forecasts get NO icon rather
+            // than today's condition, which would mislabel a forecast; they show their own label.
+            return 0;
+        }
+        if (t == Complications.COMPLICATION_TYPE_RESPIRATION_RATE) { return 0xef62; }  // lungs
+        // Icons instead of long labels ("VO2 MAX RUN", "TRAINING STATUS") that can't fit a corner.
+        if (t == Complications.COMPLICATION_TYPE_VO2MAX_RUN) { return 0xec82; }        // runner
+        if (t == Complications.COMPLICATION_TYPE_VO2MAX_BIKE) { return 0xea36; }       // bike
+        if (t == Complications.COMPLICATION_TYPE_TRAINING_STATUS) { return 0xeb43; }   // trending-up
+        if (t == Complications.COMPLICATION_TYPE_CURRENT_TEMPERATURE) { return 0xeb38; } // thermometer
         if (t == Complications.COMPLICATION_TYPE_SLEEP_SCORE) { return 0xeaf8; }
         if (t == Complications.COMPLICATION_TYPE_RECOVERY_TIME) { return 0xf228; }
         if (t == Complications.COMPLICATION_TYPE_SOLAR_INPUT) { return 0xeb30; }
         return 0;
     }
 
-    private function weatherCode() as Number {
-        try {
-            var cc = Weather.getCurrentConditions();
-            if (cc != null && cc.condition != null) {
-                return weatherGlyph(cc.condition);
-            }
-        } catch (ex) {
-        }
-        return 0xea76; // cloud
-    }
-
-    private function weatherGlyph(c as Number) as Number {
+    //! Weather condition -> icon glyph in cg_icon. `night` swaps the sun for the moon on the clear
+    //! and partly-cloudy icons. 0xE001 / 0xE002 are the composited cloud-with-sun / cloud-with-moon
+    //! (tools/build_fonts_chivo.py) - Tabler has no partly-cloudy icon of its own.
+    private function weatherGlyph(c as Number, night as Boolean) as Number {
         if (c == Weather.CONDITION_CLEAR || c == Weather.CONDITION_FAIR
-         || c == Weather.CONDITION_MOSTLY_CLEAR || c == Weather.CONDITION_PARTLY_CLEAR) {
-            return 0xeb30;
+         || c == Weather.CONDITION_MOSTLY_CLEAR) {
+            return night ? 0xeaf8 : 0xeb30;                      // moon / sun
+        }
+        if (c == Weather.CONDITION_PARTLY_CLOUDY || c == Weather.CONDITION_PARTLY_CLEAR
+         || c == Weather.CONDITION_THIN_CLOUDS) {
+            return night ? 0xE002 : 0xE001;                      // cloud+moon / cloud+sun
         }
         if (c == Weather.CONDITION_THUNDERSTORMS || c == Weather.CONDITION_SCATTERED_THUNDERSTORMS
          || c == Weather.CONDITION_CHANCE_OF_THUNDERSTORMS || c == Weather.CONDITION_HURRICANE
@@ -709,6 +936,6 @@ class ClaudeGridView extends WatchUi.WatchFace {
         if (c == Weather.CONDITION_WINDY || c == Weather.CONDITION_SQUALL) {
             return 0xec34;
         }
-        return 0xea76; // cloud (and unknown)
+        return 0xea76; // cloud: MOSTLY_CLOUDY, CLOUDY (overcast) and anything unknown
     }
 }

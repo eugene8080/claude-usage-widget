@@ -5,4 +5,27 @@
     <string id="colWhite">White</string>
     <string id="colOrange">Claude Orange</string>
     <string id="colGray">Gray</string>
+
+    <!-- Data 08 time-zone settings (on-watch menu + Garmin Connect) -->
+    <string id="settingsTitle">Claude Grid</string>
+    <string id="altTzCityTitle">Data 08 time zone</string>
+    <string id="altTzAlwaysTitle">Always the clock</string>
+    <string id="altTzAlwaysSub">Over picked field</string>
+    <!-- Garmin Connect has room for the full sentence. -->
+    <string id="altTzAlwaysLong">Data 08: always show the time-zone clock (even if a complication is picked)</string>
+    <string id="tzNewYork">New York</string>
+    <string id="tzChicago">Chicago</string>
+    <string id="tzLosAngeles">Los Angeles</string>
+    <string id="tzLondon">London</string>
+    <string id="tzParis">Paris</string>
+    <string id="tzZurich">Zurich</string>
+    <string id="tzDubai">Dubai</string>
+    <string id="tzMumbai">Mumbai</string>
+    <string id="tzSingapore">Singapore</string>
+    <string id="tzHongKong">Hong Kong</string>
+    <string id="tzShanghai">Shanghai</string>
+    <string id="tzTokyo">Tokyo</string>
+    <string id="tzSydney">Sydney</string>
+    <string id="tzAuckland">Auckland</string>
+    <string id="tzUtc">UTC</string>
 </strings>
