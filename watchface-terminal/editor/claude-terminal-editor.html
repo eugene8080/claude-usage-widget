@@ -323,7 +323,7 @@ function bindColor(pid,hid,set){ const p=document.getElementById(pid), h=documen
   p.oninput=()=>{ h.value=p.value; set(p.value); markCustom(); draw(); };
   h.oninput=()=>{ let v=h.value.trim(); if(!/^#/.test(v)) v="#"+v; if(/^#[0-9a-fA-F]{6}$/.test(v)){ p.value=v; set(v); markCustom(); draw(); } }; }
 bindColor("cBg","cBgH",v=>P.bg=v); bindColor("cAcc","cAccH",v=>P.accent=v); bindColor("cVal","cValH",v=>P.val=v);
-bindColor("cDim","cDimH",v=>P.dim=v); bindColor("cTrk","cTrkH",v=>P.track=v); bindColor("cCap","cCapH",v=>P.cap=v); bindColor("cGlw","cGlwH",v=>P.glow=v);
+bindColor("cDim","cDimH",v=>P.dim=v); bindColor("cTrk","cTrkH",v=>P.track=v); bindColor("cCap","cCapH",v=>P.cap=v); bindColor("cGlw","cGlwH",v=>{ P.glow=v; document.getElementById("vfd").checked=true; });  // glow only shows in VFD style
 function linkAllColours(){ linkVal("cBg","cBgH",P.bg); linkVal("cAcc","cAccH",P.accent); linkVal("cVal","cValH",P.val); linkVal("cDim","cDimH",P.dim); linkVal("cTrk","cTrkH",P.track); linkVal("cCap","cCapH",P.cap); linkVal("cGlw","cGlwH",P.glow); }
 
 function refresh(){ const e=P.el; let L=[
