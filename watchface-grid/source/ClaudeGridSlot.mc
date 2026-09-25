@@ -12,7 +12,7 @@ module SlotKind {
 }
 
 //! One user-editable data field. Draws itself (chip or ring) at a fixed centre using the shared
-//! Chivo Mono bitmap fonts, and exposes a bounding box so the view can hit-test taps and the
+//! Roboto Mono bitmap fonts, and exposes a bounding box so the view can hit-test taps and the
 //! native watch face editor can "pulse" the selected slot. The view feeds it a live icon, value
 //! and (for rings) fill fraction as the assigned complication updates.
 //!

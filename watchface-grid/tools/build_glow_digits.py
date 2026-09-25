@@ -9,7 +9,7 @@ only with packingFormat="png" on the bitmap resource (see write_drawables).
 
 GLYPH SOURCE. The mask is cropped straight out of resources/fonts/cg_time_0.png using the
 cg_time.fnt metrics, so the bitmaps are pixel-for-pixel the font's own shapes and land exactly
-where the font would draw them. (Run tools/build_fonts_chivo.py first if the font changed.)
+where the font would draw them. (Run tools/build_fonts_grid.py first if the font changed.)
 
 CELL. Every digit is emitted on ONE uniform cell = the union of all glyph boxes relative to the
 pen origin, plus PAD on every side for the bloom. So the runtime placement is a constant offset
@@ -62,15 +62,17 @@ PAD = 18  # bloom margin on every side; the wide glow (sigma 7) is < 1% alpha by
 Y_CALIBRATION = 1
 
 # Palette - must stay in lock-step with ClaudeGridView.HOUR_COL and GridDraw.GRAD_A / GRAD_B.
+# Teal VFD palette from the layout editor, 2026-09-25 (the Claude orange set is the editor's
+# "Claude" theme: GRAD ff9255 -> ff3c3b, hour glow ffc4a4, minute glow = follow the gradient).
 HOUR_TOP = (255, 255, 255)
-HOUR_BOT = (242, 229, 220)       # faint warm fall-off so the white hour has some depth
-HOUR_GLOW = (255, 196, 164)      # peach bloom - ties the white hour into the orange palette
+HOUR_BOT = (226, 244, 238)       # faint teal fall-off so the white hour has some depth
+HOUR_GLOW = (0x1E, 0xC6, 0x93)   # IV-22 teal bloom (editor "Hour glow"; Claude theme: ffc4a4)
 # Minute bloom: None = each row glows in its own gradient colour (orange above, red below); a
 # fixed (r, g, b) overrides it. Both are settable with --hour-glow / --minute-glow (hex), which is
 # what the layout editor's "Hour glow" / "Minute glow" pickers map to.
-MINUTE_GLOW = None
-GRAD_A = (0xFF, 0x92, 0x55)      # Gradient 1 (warm orange) - top of the minute
-GRAD_B = (0xFF, 0x3C, 0x3B)      # Gradient 2 (hot red)     - bottom of the minute
+MINUTE_GLOW = (0x1E, 0xC6, 0x93) # editor "Minute glow" (None = follow the minute gradient)
+GRAD_A = (0xB4, 0xEE, 0xDE)      # Gradient 1 (pale teal)  - top of the minute
+GRAD_B = (0x1E, 0xC6, 0x93)      # Gradient 2 (IV-22 teal) - bottom of the minute
 
 # The font path's minute gradient (ClaudeGridView.drawGradientText): over yc +/- HALF_H, solid
 # Gradient 1 for the top (0.5 - FADE/2), a linear blend across the middle FADE, solid Gradient 2

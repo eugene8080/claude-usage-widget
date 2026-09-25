@@ -1,0 +1,20 @@
+info face="Claude Grid arc" size=454 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=1 aa=1 padding=0,0,0,0 spacing=1,1 outline=0
+common lineHeight=19 base=19 scaleW=256 scaleH=32 pages=1 packed=0 alphaChnl=0 redChnl=0 greenChnl=0 blueChnl=0
+page id=0 file="cg_arc_0.png"
+chars count=16
+char id=57664 x=1 y=1 width=17 height=19 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57665 x=19 y=1 width=17 height=19 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57666 x=37 y=1 width=17 height=18 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57667 x=55 y=1 width=15 height=18 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57668 x=71 y=1 width=15 height=18 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57669 x=87 y=1 width=13 height=17 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57670 x=101 y=1 width=13 height=17 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57671 x=115 y=1 width=12 height=16 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57672 x=128 y=1 width=12 height=16 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57673 x=141 y=1 width=13 height=17 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57674 x=155 y=1 width=13 height=17 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57675 x=169 y=1 width=15 height=18 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57676 x=185 y=1 width=15 height=18 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57677 x=201 y=1 width=17 height=18 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57678 x=219 y=1 width=17 height=19 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15
+char id=57679 x=237 y=1 width=17 height=19 xoffset=0 yoffset=0 xadvance=17 page=0 chnl=15

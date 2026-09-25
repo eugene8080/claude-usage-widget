@@ -7,9 +7,9 @@ import Toybox.Math;
 //! is identical everywhere. Colours mirror the HTML layout editor's Gradient 1 / Gradient 2.
 module GridDraw {
 
-    const TRACK = 0x3A2A22;   // ring/arc background (dark warm)
-    const GRAD_A = 0xFF9255;  // Gradient 1 (warm orange) - top of the fill
-    const GRAD_B = 0xFF3C3B;  // Gradient 2 (hot red)      - end of the fill
+    const TRACK = 0x333333;   // ring/arc/tick background: neutral dark grey, so it suits any theme
+    const GRAD_A = 0xB4EEDE;  // Gradient 1 (pale teal)  - top of the fill   (Claude theme: FF9255)
+    const GRAD_B = 0x1EC693;  // Gradient 2 (IV-22 teal) - end of the fill   (Claude theme: FF3C3B)
 
     //! Linear interpolate between two 0xRRGGBB colours.
     function lerp(a as Number, b as Number, t as Float) as Number {
@@ -119,10 +119,33 @@ module GridDraw {
     //! Each dash is a FILLED rectangle (fillPolygon), not a thick drawLine: CIQ renders wide short
     //! lines with rounded/chunky caps, which read as blobs at this size. Building the quad from the
     //! radial and its perpendicular keeps every dash a crisp rectangle at any angle.
+    //!
+    //! With `arcFont` (cg_arc, tools/build_arc_font.py) on a 454 px screen, each dash is instead a
+    //! pre-rasterised glyph drawn at its generated screen position (ArcMetrics): exact, identical coverage for all 16
+    //! (the polygons land on the pixel grid at different sub-pixel phases and look uneven/soft).
+    //! The glyph geometry is fixed (R 224, 122.5 -> 57.5 deg, 16 dashes, 10 x 15), matching the
+    //! only call site; -1 on y cancels CIQ drawing font glyphs one row low (measured).
+    const ARC_FIRST = 0xE140;
+    var _arcChars as Array<String>? = null;
+
     function segmentArc(dc as Dc, cx as Numeric, cy as Numeric, r as Numeric,
                         startDeg as Float, endDeg as Float, n as Number, frac as Float,
-                        penW as Number, dashLen as Number) as Void {
+                        penW as Number, dashLen as Number, arcFont as Graphics.FontType?) as Void {
         var lit = (n * frac).toNumber();
+        if (arcFont != null && dc.getWidth() == 454 && n == 16) {
+            if (_arcChars == null) {
+                var arr = new Array<String>[n];
+                for (var i = 0; i < n; i++) { arr[i] = (ARC_FIRST + i).toChar().toString(); }
+                _arcChars = arr;
+            }
+            var chars = _arcChars as Array<String>;
+            for (var i = 0; i < n; i++) {
+                dc.setColor(i < lit ? lerp(GRAD_A, GRAD_B, i.toFloat() / n) : TRACK,
+                    Graphics.COLOR_TRANSPARENT);
+                dc.drawText(ArcMetrics.X[i], ArcMetrics.Y[i] - 1, arcFont, chars[i], Graphics.TEXT_JUSTIFY_LEFT);
+            }
+            return;
+        }
         var hw = penW / 2.0;
         for (var i = 0; i < n; i++) {
             var a = (startDeg + (endDeg - startDeg) * i / (n - 1)) * Math.PI / 180.0;

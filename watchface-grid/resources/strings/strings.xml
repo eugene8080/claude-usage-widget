@@ -1,6 +1,7 @@
 <strings>
     <string id="AppName">Claude Grid</string>
     <!-- data-colour picker labels for the native watch face editor -->
+    <string id="colTeal">Teal</string>
     <string id="colPeach">Peach</string>
     <string id="colWhite">White</string>
     <string id="colOrange">Claude Orange</string>
