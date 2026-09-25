@@ -83,7 +83,29 @@ def generate(out_base: str, size: int, chars: str, atlas_w: int = 256) -> None:
         raise SystemExit("!!! %s is blank - a blank atlas silently kills all text" % out_base)
 
 
+def generate_outline(out_base: str, size: int, chars: str, stroke: int = 2,
+                     atlas_w: int = 512) -> None:
+    """The always-on time: hollow, anti-aliased `stroke`-px OUTLINES of the same glyphs.
+
+    Uses Claude Grid's genfont outline renderer (supersampled distance-transform band, coverage in
+    RGB and alpha) rather than a second copy of it. Its .fnt uses the same line metrics as
+    generate() above (lineHeight = ascent + descent, offsets from the line top) and IBM Plex Mono
+    is monospace, so an outline glyph lands exactly where its solid twin does and the face can
+    swap fonts without moving the time.
+    """
+    import sys
+    sys.path.insert(0, os.path.join(HERE, "..", "..", "watchface-grid", "tools"))
+    import genfont  # noqa: E402  (watchface-grid/tools/genfont.py)
+    genfont.generate(TTF, out_base, size, chars, atlas_w, face_name=FACE, weight=WEIGHT,
+                     stroke=stroke)
+    bb = Image.open(out_base + "_0.png").getchannel("A").getbbox()
+    if bb is None:
+        raise SystemExit("!!! %s is blank - a blank atlas silently kills all text" % out_base)
+
+
 if __name__ == "__main__":
     generate(os.path.join(OUT, "stm_time"), 70, TIME_CHARS, 256)    # editor: time size
+    # always-on time: 2 px outline (Claude Grid's cg_time_o weight), digits + colon only
+    generate_outline(os.path.join(OUT, "stm_time_o"), 70, TIME_CHARS, 2)
     generate(os.path.join(OUT, "stm_text"), 26, TEXT_CHARS, 256)    # editor: prompt size
     generate(os.path.join(OUT, "stm_small"), 25, TEXT_CHARS, 256)   # editor: date + rows size

@@ -70,6 +70,7 @@ HTML = r"""<!doctype html>
       <div class="row chk"><input type="checkbox" id="snap" checked><label style="flex:0 0 auto">Snap to align (vertical + horizontal)</label></div>
       <div class="row chk"><input type="checkbox" id="secs"><label style="flex:0 0 auto">Show seconds (HH:MM:SS)</label></div>
       <div class="row chk"><input type="checkbox" id="vfd"><label style="flex:0 0 auto" title="glowing bitmap time + one mesh over the whole face">VFD style (glow time + full-face mesh)</label></div>
+      <div class="row chk"><input type="checkbox" id="lowp"><label style="flex:0 0 auto" title="what the watch shows in always-on: outline HH:MM, no mesh, no grey tracks">Low-power preview (always-on mode)</label></div>
     </div>
     <div class="panel">
       <h2>Preview time &amp; date</h2>
@@ -159,7 +160,7 @@ function defaults(){return {
     batt:  {name:"Battery bar", kind:"batt", x:0.500, y:0.845, segs:16, segW:0.022, gap:0.011, h:0.033},
   }};}
 
-let P=defaults(), sel=null, guide=null, boxes={};
+let P=defaults(), sel=null, guide=null, boxes={}, lowPower=false;
 
 // Preview clock (sliders). Formats follow the face: hour "%02d" (12 h -> 01-12), date "Fri Sep 25".
 const MONTHS=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"], DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
@@ -170,7 +171,7 @@ function pad2(v){ return (v<10?"0":"")+v; }
 function daysIn(){ return new Date(PV.year,PV.mon,0).getDate(); }
 function previewDate(){ return new Date(PV.year,PV.mon-1,PV.day,PV.h,PV.m,PV.s); }
 function HH(){ let h=PV.h; if(!PV.h24){ h=h%12; if(h==0) h=12; } return pad2(h); }
-function timeStr(){ return HH()+":"+pad2(PV.m)+(P.showSeconds?":"+pad2(PV.s):""); }
+function timeStr(){ return HH()+":"+pad2(PV.m)+(P.showSeconds&&!lowPower?":"+pad2(PV.s):""); }  // always-on: HH:MM
 function dateStr(){ const d=previewDate(); return DAYS[d.getDay()]+" "+MONTHS[PV.mon-1]+" "+PV.day; }
 
 function fnt(px){return px+"px '"+P.font+"',monospace";}
@@ -185,6 +186,11 @@ function ciqText(s,x,top,align){ ctx.textAlign="left"; ctx.textBaseline="alphabe
   const m=ctx.measureText(s), w=Math.round(m.width); let left=Math.round(x);
   if(align=="center") left-=Math.floor(w/2); else if(align=="right") left-=w;
   ctx.fillText(s,left,Math.round(top)+m.fontBoundingBoxAscent+1); return w; }
+// Always-on time: the same placement, stroked 2 px like the face's stm_time_o outline font.
+function ciqStroke(s,x,top,align,color){ ctx.textAlign="left"; ctx.textBaseline="alphabetic";
+  const m=ctx.measureText(s), w=Math.round(m.width); let left=Math.round(x);
+  if(align=="center") left-=Math.floor(w/2); else if(align=="right") left-=w;
+  ctx.lineWidth=2; ctx.strokeStyle=color; ctx.strokeText(s,left,Math.round(top)+m.fontBoundingBoxAscent+1); return w; }
 
 // The VFD mesh: every third screen row and column darkened 30% (one lattice for the whole face).
 const _mesh=document.createElement("canvas"); _mesh.width=3; _mesh.height=3;
@@ -195,6 +201,7 @@ function drawEl(k){ const e=P.el[k];
   if(e.kind=="text"){ const x=e.x*SZ, y=e.y*SZ; ctx.fillStyle=P.accent; ctx.font=fnt(e.size); const w=ciqText(e.text,x,y,"center");
     boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+e.size+4]; return; }
   if(e.kind=="time"){ const x=e.x*SZ, y=e.y*SZ, t=timeStr(); ctx.fillStyle=P.val; ctx.font=fnt(e.size);
+    if(lowPower){ const w=ciqStroke(t,x,y,"center",P.val); boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+e.size+4]; return; }
     if(P.vfd){ const g=hexRgb(P.glow); ctx.save(); ctx.shadowBlur=16; ctx.shadowColor="rgba("+g.join(",")+",0.9)"; ciqText(t,x,y,"center"); ctx.restore(); }
     const w=ciqText(t,x,y,"center"); boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+e.size+4]; return; }
   if(e.kind=="date"){ const x=e.x*SZ, y=e.y*SZ, t=dateStr(); ctx.fillStyle=P.dim; ctx.font=fnt(e.size); const w=ciqText(t,x,y,"center");
@@ -204,26 +211,26 @@ function drawEl(k){ const e=P.el[k];
       ctx.fillStyle=P.dim; ciqText(r.lb, e.labelX*SZ, y, "left");
       // bars on whole pixels, like the face (rect() snaps every edge)
       const bx=Math.round(e.barX*SZ), bw=Math.round(e.barW*SZ), bh=Math.round(e.barH*SZ), by=Math.round(y+0.018*SZ);
-      ctx.fillStyle=P.track; ctx.fillRect(bx,by,bw,bh);
+      if(!lowPower){ ctx.fillStyle=P.track; ctx.fillRect(bx,by,bw,bh); }  // always-on: fill only
       const fw=Math.round(bw*Math.min(100,r.pct)/100); ctx.fillStyle=(r.pct>=80)?P.cap:P.accent; ctx.fillRect(bx,by,fw,bh);
       ctx.fillStyle=P.val; ciqText(r.pct+"%", e.pctX*SZ, y, "right");
       ctx.fillStyle=P.dim; ciqText(r.rs, e.resetX*SZ, y, "right");
     }
     boxes[k]=[e.labelX*SZ-6, y0-6, e.resetX*SZ+6, y0+2*gy+e.size+6]; return; }
-  if(e.kind=="cursor"){ const x=e.x*SZ, y=e.y*SZ, w=e.w*SZ, h=e.h*SZ; ctx.fillStyle=P.accent;
+  if(e.kind=="cursor"){ if(lowPower){ boxes[k]=[e.x*SZ-8,e.y*SZ-8,e.x*SZ+8,e.y*SZ+8]; return; } const x=e.x*SZ, y=e.y*SZ, w=e.w*SZ, h=e.h*SZ; ctx.fillStyle=P.accent;
     const x0=Math.round(x-w/2), y0=Math.round(y); ctx.fillRect(x0,y0,Math.round(x-w/2+w)-x0,Math.round(y+h)-y0);
     boxes[k]=[x-w/2-4,y-4,x+w/2+4,y+h+4]; return; }
   if(e.kind=="batt"){ // exactly the face's drawBattery(): whole-pixel segments, centred on x
     const n=e.segs, sw=Math.max(1,Math.round(e.segW*SZ)), gp=Math.round(e.gap*SZ), bh=Math.max(1,Math.round(e.h*SZ));
     const total=n*sw+(n-1)*gp, x0=Math.round(e.x*SZ)-Math.floor(total/2), y0=Math.round(e.y*SZ);
     const lit=Math.min(n,Math.ceil(n*PV.batt/100)), low=PV.batt<=20;
-    for(let i=0;i<n;i++){ ctx.fillStyle=(i<lit)?(low?P.cap:P.accent):P.track; ctx.fillRect(x0+i*(sw+gp),y0,sw,bh); }
+    for(let i=0;i<n;i++){ if(lowPower&&i>=lit) break; ctx.fillStyle=(i<lit)?(low?P.cap:P.accent):P.track; ctx.fillRect(x0+i*(sw+gp),y0,sw,bh); }
     boxes[k]=[x0-4,y0-4,x0+total+4,y0+bh+4]; return; }
 }
 
-function draw(){ P.vfd=document.getElementById("vfd").checked; ctx.fillStyle=P.bg; ctx.fillRect(0,0,SZ,SZ); boxes={};
+function draw(){ lowPower=document.getElementById("lowp").checked; P.vfd=document.getElementById("vfd").checked; ctx.fillStyle=P.bg; ctx.fillRect(0,0,SZ,SZ); boxes={};
   ["prompt","time","date","rows","batt","cursor"].forEach(drawEl);
-  if(P.vfd) meshOverlay();
+  if(P.vfd && !lowPower) meshOverlay();
   if(sel&&boxes[sel]){ const b=boxes[sel]; ctx.strokeStyle="#D97757"; ctx.lineWidth=1; ctx.setLineDash([4,3]); ctx.strokeRect(b[0],b[1],b[2]-b[0],b[3]-b[1]); ctx.setLineDash([]); }
   if(guide){ ctx.strokeStyle="#39d98a"; ctx.lineWidth=1; ctx.setLineDash([3,3]);
     if(guide.x!=null){ ctx.beginPath(); ctx.moveTo(guide.x,0); ctx.lineTo(guide.x,SZ); ctx.stroke(); }
@@ -236,7 +243,12 @@ function snapAxis(val,others){ let best=val,g=null,bd=0.014; const t=[0.5].conca
 let drag=null; const cv=document.getElementById("c");
 cv.addEventListener("pointerdown",ev=>{ if(document.activeElement&&document.activeElement!==document.body) document.activeElement.blur(); // arrows -> watch
   const r=cv.getBoundingClientRect(), mx=(ev.clientX-r.left)*SZ/r.width, my=(ev.clientY-r.top)*SZ/r.height; const k=hit(mx,my);
-  if(k){ sel=k; drag=k; cv.setPointerCapture(ev.pointerId); cv.style.cursor="grabbing"; syncPanel(); draw(); } });
+  if(k){ sel=k; drag=k; cv.setPointerCapture(ev.pointerId); cv.style.cursor="grabbing"; syncPanel(); draw(); } else deselect(); });
+// Clicking away from the watch - its empty areas (above), or anywhere on the page outside the
+// settings panel - drops the selection and its orange frame. The panel keeps it: its controls
+// edit the selected element. Esc does the same (keydown handler).
+function deselect(){ if(sel==null) return; sel=null; guide=null; syncPanel(); draw(); }
+document.addEventListener("pointerdown",ev=>{ if(ev.target===cv) return; if(ev.target.closest&&ev.target.closest(".side")) return; deselect(); });
 cv.addEventListener("pointermove",ev=>{ if(!drag)return; const r=cv.getBoundingClientRect(); let nx=Math.max(0.02,Math.min(0.98,(ev.clientX-r.left)/r.width)), ny=Math.max(0.02,Math.min(0.98,(ev.clientY-r.top)/r.height)); guide=null;
   const e=P.el[drag]; const hasX=(e.x!=null);
   if(document.getElementById("snap").checked){ const ox=[],oy=[]; for(const kk in P.el){ if(kk!=drag){ if(P.el[kk].x!=null)ox.push(P.el[kk].x); if(P.el[kk].y!=null)oy.push(P.el[kk].y);} } const sx=snapAxis(nx,ox), sy=snapAxis(ny,oy); nx=sx[0]; ny=sy[0]; guide={x:hasX?sx[1]:null,y:sy[1]}; }
@@ -251,6 +263,7 @@ document.addEventListener("keydown",ev=>{
   if(tag=="INPUT"||tag=="SELECT"||tag=="TEXTAREA"||tag=="BUTTON") return;
   if(ev.key=="Tab"){ ev.preventDefault(); const o=tabOrder(); const i=o.indexOf(sel);
     sel=(i<0)?o[ev.shiftKey?o.length-1:0]:o[(i+(ev.shiftKey?-1:1)+o.length)%o.length]; syncPanel(); draw(); return; }
+  if(ev.key=="Escape"){ deselect(); return; }
   if(!sel) return;
   const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key]; if(!d) return;
   ev.preventDefault(); const step=ev.shiftKey?10:1, e=P.el[sel], clamp=v=>Math.max(0.02,Math.min(0.98,v));
@@ -316,6 +329,7 @@ bindR("bbhR","bbhRV",3,v=>{ if(sel)P.el[sel].h=v; });
 document.getElementById("txt").oninput=function(){ if(sel&&P.el[sel].kind=="text"){ P.el[sel].text=this.value; draw(); } };
 document.getElementById("secs").onchange=function(){ P.showSeconds=this.checked; draw(); };
 document.getElementById("vfd").onchange=draw;
+document.getElementById("lowp").onchange=draw;
 
 // Preview time & date sliders
 function syncPV(){ document.getElementById("pvD").max=daysIn(); if(PV.day>daysIn()) PV.day=daysIn();

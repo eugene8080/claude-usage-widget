@@ -271,7 +271,12 @@ function snapAxis(val,others){ let best=val,g=null,bd=0.014; const t=[0.5].conca
 let drag=null; const cv=document.getElementById("c");
 cv.addEventListener("pointerdown",ev=>{ if(document.activeElement&&document.activeElement!==document.body) document.activeElement.blur(); // arrows -> watch, not the last dropdown
   const r=cv.getBoundingClientRect(), mx=(ev.clientX-r.left)*SZ/r.width, my=(ev.clientY-r.top)*SZ/r.height; const k=hit(mx,my);
-  if(k){ sel=k; drag=k; cv.setPointerCapture(ev.pointerId); cv.style.cursor="grabbing"; syncPanel(); draw(); } });
+  if(k){ sel=k; drag=k; cv.setPointerCapture(ev.pointerId); cv.style.cursor="grabbing"; syncPanel(); draw(); } else deselect(); });
+// Clicking away from the watch - its empty areas (above), or anywhere on the page outside the
+// settings panel - drops the selection and its orange frame. The panel keeps it: its controls
+// edit the selected element. Esc does the same (keydown handler).
+function deselect(){ if(sel==null) return; sel=null; guide=null; syncPanel(); draw(); }
+document.addEventListener("pointerdown",ev=>{ if(ev.target===cv) return; if(ev.target.closest&&ev.target.closest(".side")) return; deselect(); });
 cv.addEventListener("pointermove",ev=>{ if(!drag)return; const r=cv.getBoundingClientRect(); let nx=Math.max(0.02,Math.min(0.98,(ev.clientX-r.left)/r.width)), ny=Math.max(0.02,Math.min(0.98,(ev.clientY-r.top)/r.height)); guide=null;
   if(document.getElementById("snap").checked && drag!="arc"){ const ox=[],oy=[]; for(const kk in P.el){ if(kk!=drag){ ox.push(P.el[kk].x); oy.push(P.el[kk].y);} } const sx=snapAxis(nx,ox), sy=snapAxis(ny,oy); nx=sx[0]; ny=sy[0]; guide={x:sx[1],y:sy[1]}; }
   if(drag=="arc"){ P.arc.rad=Math.max(120,Math.min(228, cy - ny*SZ)); guide=null; } else if(drag=="week"){ P.el.week.y=ny; } else { P.el[drag].x=nx; P.el[drag].y=ny; mirror(drag); } draw(); });
@@ -293,6 +298,7 @@ document.addEventListener("keydown",ev=>{
   if(ev.key=="Tab"){ ev.preventDefault(); const o=tabOrder(); const i=o.indexOf(sel);
     sel=(i<0)?o[ev.shiftKey?o.length-1:0]:o[(i+(ev.shiftKey?-1:1)+o.length)%o.length];
     syncPanel(); draw(); return; }
+  if(ev.key=="Escape"){ deselect(); return; }
   if(!sel) return;
   const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[ev.key];
   if(!d) return;
