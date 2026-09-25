@@ -5,4 +5,13 @@
     <setting propertyKey="@Properties.PromptText" title="@Strings.promptTextTitle">
         <settingConfig type="alphaNumeric" maxLength="24" />
     </setting>
+    <setting propertyKey="@Properties.Theme" title="@Strings.themeTitle">
+        <settingConfig type="list">
+            <listEntry value="0">@Strings.themeNightOwl</listEntry>
+            <listEntry value="1">@Strings.themeRetroTube</listEntry>
+        </settingConfig>
+    </setting>
+    <setting propertyKey="@Properties.Scanlines" title="@Strings.scanlinesTitle">
+        <settingConfig type="boolean" />
+    </setting>
 </settings>

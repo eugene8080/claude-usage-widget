@@ -5,8 +5,26 @@ A terminal/CLI-styled watch face for fenix 8 class watches (incl. tactix 8), mod
 (5H / 1W / model) as CLI rows with bars, percentages, and reset times, plus a segmented battery
 bar (the straight counterpart of Claude Grid's battery arc), in IBM Plex Mono on the Night Owl
 palette, with a glowing VFD time. In always-on (low power) the time becomes a 2 px outline HH:MM
-(`stm_time_o`, from `tools/build_fonts_terminal.py`) and the mesh, seconds and grey tracks go, as
+(`stm_time_o`, from `tools/build_fonts_terminal.py`), the seconds and grey tracks go and the VFD mesh
+(or scanlines) stays, much as
 on Claude Grid.
+
+A weather line sits at the top (condition icon + temperature, from `Toybox.Weather`; the icons
+are Claude Grid's `cg_icon`, copied as `stm_icon` by `tools/build_fonts_terminal.py`). Garmin
+Connect settings add a **colour theme** - Night Owl or **Retro tube** (green phosphor on a dark
+green background; its own glow digit set, `rt*`, from `tools/build_glow_time.py`) - and
+**Scanlines**, which swaps the VFD mesh for horizontal CRT lines (`scan_tile`). Always-on stays
+black in every theme, with the mesh / scanlines still over it.
+
+In Retro tube *everything* glows. CIQ can't blur, so the text, the prompt and the weather icon
+each have a pre-rendered halo font (`*_glow`, `glow_from_bmfont` in `tools/build_fonts_terminal.py`)
+drawn under the sharp text in the text colour blended halfway to the background, and the lit bars
+and battery segments get a two-step halo of rectangles. CIQ renders font coverage in only 4 levels,
+so the halo is generated at full strength and quantises into three even glow steps.
+
+All four settings are also on the watch (hold the face > Settings, `ClaudeFaceSettings.mc`),
+including the prompt text via the watch's text entry (`WatchUi.TextPicker`) - the only way to set
+them on a sideloaded face, since Garmin Connect edits settings only for store installs.
 
 Updated: 2026-09-25
 
@@ -27,7 +45,7 @@ and the watch-app opened once so its 5-minute background publish is registered.
 - **Show seconds** (on by default) - the time shows `HH:MM:SS`. In high-power mode the whole
   face redraws every second. In always-on (low-power) mode the AMOLED tactix 8 doesn't call
   `onPartialUpdate`, so it holds the last second until you raise your wrist.
-- **Prompt text** - the top line (default `eugene@tactix ~ $`, up to 24 characters). The layout
+- **Prompt text** - the top line (default `fenix@tactix ~ $`, up to 24 characters). The layout
   editor's Prompt text is the default; the setting overrides it without a rebuild.
 - A face that was already installed keeps its **stored** settings when you sideload a new build.
   So if it still shows the old prompt or no seconds, change them in Garmin Connect.

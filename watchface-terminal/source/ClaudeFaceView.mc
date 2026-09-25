@@ -6,6 +6,7 @@ import Toybox.Math;
 import Toybox.System;
 import Toybox.Time;
 import Toybox.Time.Gregorian;
+import Toybox.Weather;
 import Toybox.WatchUi;
 
 //! The Claude terminal watch face.
@@ -13,7 +14,7 @@ import Toybox.WatchUi;
 //! Layout comes straight from the HTML layout editor: a prompt line, the big time, the date, then
 //! three CLI-style rows (5H / 1W / model) each with a bar, percentage and reset time, a segmented
 //! battery bar, and a blinking cursor. Night Owl colours on black, in IBM Plex Mono. In always-on
-//! the time drops to a thin outline HH:MM and the grey tracks and mesh go (see _lowPower).
+//! the time drops to a thin outline HH:MM and the grey tracks go; the mesh / scanlines stay (see _lowPower).
 //!
 //! The values come from the published complications. We can't construct a custom complication's Id
 //! directly (its identity is an internal UUID), so onShow ENUMERATES the available complications,
@@ -22,14 +23,17 @@ import Toybox.WatchUi;
 //! field as raw epoch-seconds and formatted here.
 class ClaudeFaceView extends WatchUi.WatchFace {
 
-    // Night Owl theme (layout editor). The background is black (dc.clear / COLOR_BLACK); the
-    // VFD time's face + glow colours are baked into the bitmaps by tools/build_glow_time.py.
-    private const ACCENT = 0x82AAFF;      // prompt, bar fill, cursor
-    private const VALUE = 0xD6DEEB;       // time + percentage
-    private const TRACK = 0x333333;       // empty bar background
-    private const DIM = 0x7F9C9C;         // date, labels, reset times
-    private const NEAR_CAP = 0xEF5350;    // bar fill at 80%+
-    private const DEFAULT_PROMPT = "eugene@tactix ~ $";
+    // Colour theme (the "Theme" setting; see applyTheme). Night Owl by default. The VFD time's
+    // face + glow colours are baked into a digit set per theme by tools/build_glow_time.py, so
+    // VALUE and ACCENT here must stay in step with its THEMES table.
+    private var ACCENT as Number = 0x82AAFF;      // prompt, bar fill, cursor, weather icon
+    private var VALUE as Number = 0xD6DEEB;       // time + percentage + temperature
+    private var TRACK as Number = 0x333333;       // empty bar background
+    private var DIM as Number = 0x7F9C9C;         // date, labels, reset times
+    private var NEAR_CAP as Number = 0xEF5350;    // bar fill at 80%+
+    private var BG as Number = 0x000000;          // high-power background (always-on is black)
+    private const DEFAULT_PROMPT = "fenix@tactix ~ $";
+    private const THEME_RETRO = 1;
 
     // --- layout (fractions of the screen), from the editor ---
     // Prompt, time and date are centred on their x; every line is top-aligned at its y.
@@ -48,12 +52,18 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     // (16 segments of 10 x 15 px, 5 px apart on the 454 px screen = 235 px long). Centred on
     // BATT_X, top at BATT_Y, just below the meter rows. Sizes are fractions of the WIDTH, like
     // the meter bars, so the bar keeps its proportions on every screen size.
-    private const BATT_X = 0.500;    private const BATT_Y = 0.845;
+    // BATT_Y puts the bar the same 37 px below the last Claude bar as the Claude bars are apart
+    // (bars at y 239 / 290 / 341, 14 px tall -> battery top 392; was 0.845 = 384, a 29 px gap).
+    private const BATT_X = 0.500;    private const BATT_Y = 0.863;
     private const BATT_SEGS = 16;
     private const BATT_SEG_W = 0.022; private const BATT_GAP = 0.011; private const BATT_H = 0.033;
     private const BATT_LOW = 20;     // at or below this %, the lit segments turn NEAR_CAP red
     // Always-on meter bars are hollow, with the same 2 px stroke as the outline time.
     private const AOD_STROKE = 2;
+    // Weather line (icon + current temperature), centred on WX_X, top at WX_Y - above the prompt,
+    // like Rad Lad's top line.
+    private const WX_X = 0.500;      private const WX_Y = 0.095;
+    private const WX_GAP = 6;        // px between the icon and the temperature
 
     // One cache slot per meter. pct is -1 until a value arrives; resetEpoch 0 means none.
     private var _labels as Array<String> = ["5H", "1W", "--"];
@@ -63,6 +73,17 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private var _subscribed as Boolean = false;
     private var _showSeconds as Boolean = true;
     private var _prompt as String = DEFAULT_PROMPT;   // PromptText setting (Garmin Connect / editor)
+    private var _theme as Number = 0;                 // Theme setting: 0 Night Owl, 1 Retro tube
+    private var _scanlines as Boolean = false;        // Scanlines setting: CRT lines instead of mesh
+    private var _fontIcon as Graphics.FontType?;      // weather icons (stm_icon, from Claude Grid)
+    // Halo twins of the prompt / date+rows / icon fonts (Retro tube: everything glows).
+    private var _glowText as Graphics.FontType?;
+    private var _glowSmall as Graphics.FontType?;
+    private var _glowIcon as Graphics.FontType?;
+    private var _ink as Number = 0xFFFFFF;           // current text colour (see ink())
+    // Halo colour = the text colour blended this far from the background: the halo font's full-
+    // coverage core then shows at 50 %, its 2/3 and 1/3 steps at ~33 % and ~17 % (CIQ's 4 levels).
+    private const GLOW_MIX = 0.5;
 
     // IBM Plex Mono, loaded from resources - the terminal typeface for every element, at the
     // editor's sizes: prompt 26px, date + rows 25px, time 70px.
@@ -74,7 +95,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     // Always-on (low power), the same scheme as Claude Grid: onEnterSleep / onExitSleep flip it.
     // The AMOLED burn-in budget wants few, thin lit pixels, so while it is set the face draws
     // the time as HH:MM in the hollow outline font (no glow bitmaps, no seconds, no per-second
-    // repaint) left where the high-power HH:MM sits, drops the full-face mesh and every grey
+    // repaint) left where the high-power HH:MM sits, keeps the mesh / scanlines, drops every grey
     // track (meter bar backgrounds, unlit battery segments), draws the meter bars' filled part as
     // a 2 px hollow outline, and keeps the text and the lit battery segments.
     private var _lowPower as Boolean = false;
@@ -88,6 +109,10 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         _fontSmall = WatchUi.loadResource(Rez.Fonts.STMonoSmall) as Graphics.FontType;
         _fontTime = WatchUi.loadResource(Rez.Fonts.STMonoTime) as Graphics.FontType;
         _fontTimeO = WatchUi.loadResource(Rez.Fonts.STMonoTimeOutline) as Graphics.FontType;
+        _fontIcon = WatchUi.loadResource(Rez.Fonts.STIcon) as Graphics.FontType;
+        _glowText = WatchUi.loadResource(Rez.Fonts.STMonoGlow) as Graphics.FontType;
+        _glowSmall = WatchUi.loadResource(Rez.Fonts.STMonoSmallGlow) as Graphics.FontType;
+        _glowIcon = WatchUi.loadResource(Rez.Fonts.STIconGlow) as Graphics.FontType;
     }
 
     //! The prompt font (26px), falling back to the system font if the resource ever fails.
@@ -113,12 +138,46 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         }
     }
 
-    //! The "show seconds" toggle and the prompt text, from the watch/app settings.
+    //! Show seconds, prompt text, colour theme and scanlines, from the watch/app settings.
     public function readSettings() as Void {
         var v = Application.Properties.getValue("ShowSeconds");
         _showSeconds = (v instanceof Boolean) ? v : true;
         var p = Application.Properties.getValue("PromptText");
         _prompt = (p instanceof String) ? p as String : DEFAULT_PROMPT;
+        var t = Application.Properties.getValue("Theme");
+        _theme = (t instanceof Number) ? t : 0;
+        var s = Application.Properties.getValue("Scanlines");
+        _scanlines = (s instanceof Boolean) ? s : false;
+        applyTheme(_theme);
+    }
+
+    //! Set the palette for a theme (layout editor values) and switch the glow digit set to match.
+    //! Retro tube: green phosphor on a near-black green background, amber for 80 %+ (a mono-
+    //! chrome tube has no red; amber still reads as "warning" against the greens).
+    private function applyTheme(theme as Number) as Void {
+        if (theme == THEME_RETRO) {
+            ACCENT = 0x2BDC63; VALUE = 0x66FF8F; DIM = 0x1E9A48;
+            TRACK = 0x0C3318; NEAR_CAP = 0xFFB000; BG = 0x020F06;
+        } else {
+            ACCENT = 0x82AAFF; VALUE = 0xD6DEEB; DIM = 0x7F9C9C;
+            TRACK = 0x333333; NEAR_CAP = 0xEF5350; BG = 0x000000;
+        }
+        setGlowTheme(theme);
+    }
+
+    (:glow_time)
+    private function setGlowTheme(theme as Number) as Void {
+        GlowTime.setTheme(theme);
+    }
+
+    (:font_time)
+    private function setGlowTheme(theme as Number) as Void {
+    }
+
+    //! The background for the current mode: the theme's in high power, always black in always-on
+    //! (AMOLED: an unlit pixel costs nothing and can't burn in).
+    private function bg() as Number {
+        return _lowPower ? Graphics.COLOR_BLACK : BG;
     }
 
     // ---- whole-pixel drawing -----------------------------------------------------------------
@@ -140,7 +199,64 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         } else if (just == Graphics.TEXT_JUSTIFY_RIGHT) {
             left -= dc.getTextWidthInPixels(s, font);
         }
+        glowText(dc, left, px(y), font, s);
         dc.drawText(left, px(y), font, s, Graphics.TEXT_JUSTIFY_LEFT);
+    }
+
+    // ---- tube glow (Retro tube theme) ----------------------------------------------------------
+    // Everything lit glows, like a phosphor tube. CIQ can't blur, so text gets a pre-rendered halo
+    // font drawn first in the same colour (its glyphs sit exactly under the sharp ones), and the
+    // lit bars / battery segments get a two-step halo of rectangles blended from the background
+    // towards their colour. High power only: always-on stays thin and unlit.
+
+    private function glowOn() as Boolean {
+        return _theme == THEME_RETRO && !_lowPower;
+    }
+
+    //! The halo font matching `font`, or null when there is none (the time uses glow bitmaps).
+    private function glowFontFor(font as Graphics.FontType) as Graphics.FontType? {
+        if (font == _fontText) { return _glowText; }
+        if (font == _fontSmall) { return _glowSmall; }
+        if (font == _fontIcon) { return _glowIcon; }
+        return null;
+    }
+
+    //! Draw `s`'s halo at (left, top) in the current colour, when the tube glow is on.
+    private function glowText(dc as Dc, left as Number, top as Number, font as Graphics.FontType,
+                              s as String) as Void {
+        if (!glowOn()) { return; }
+        var g = glowFontFor(font);
+        if (g != null) {
+            dc.setColor(mix(BG, _ink, GLOW_MIX), Graphics.COLOR_TRANSPARENT);
+            dc.drawText(left, top, g as Graphics.FontType, s, Graphics.TEXT_JUSTIFY_LEFT);
+            dc.setColor(_ink, Graphics.COLOR_TRANSPARENT);
+        }
+    }
+
+    //! Set the text colour and remember it, so glowText can draw the halo in a blend of it.
+    private function ink(dc as Dc, color as Number) as Void {
+        _ink = color;
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+    }
+
+    //! Soft halo behind a lit rectangle: +4 px at 14 % and +2 px at 30 % of the way from the
+    //! background to `color`. Pre-blended solid colours rather than alpha, so it looks the same on
+    //! every device and costs two fills.
+    private function haloRect(dc as Dc, x as Number, y as Number, w as Number, h as Number,
+                              color as Number) as Void {
+        if (!glowOn() || w <= 0 || h <= 0) { return; }
+        dc.setColor(mix(BG, color, 0.14), Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x - 4, y - 4, w + 8, h + 8);
+        dc.setColor(mix(BG, color, 0.30), Graphics.COLOR_TRANSPARENT);
+        dc.fillRectangle(x - 2, y - 2, w + 4, h + 4);
+    }
+
+    //! Linear blend of two 0xRRGGBB colours, t = 0 -> a, 1 -> b.
+    private function mix(a as Number, b as Number, t as Float) as Number {
+        var r = ((a >> 16) & 0xFF) + ((((b >> 16) & 0xFF) - ((a >> 16) & 0xFF)) * t);
+        var g = ((a >> 8) & 0xFF) + ((((b >> 8) & 0xFF) - ((a >> 8) & 0xFF)) * t);
+        var bl = (a & 0xFF) + (((b & 0xFF) - (a & 0xFF)) * t);
+        return (r.toNumber() << 16) | (g.toNumber() << 8) | bl.toNumber();
     }
 
     //! Pixel-snapped filled rectangle: integer edges, so bar ends are hard.
@@ -219,9 +335,10 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var w = dc.getWidth();
         var h = dc.getHeight();
         if (dc has :setAntiAlias) { dc.setAntiAlias(true); }
-        dc.setColor(Graphics.COLOR_WHITE, Graphics.COLOR_BLACK);
+        dc.setColor(Graphics.COLOR_WHITE, bg());
         dc.clear();
 
+        drawWeather(dc, w, h);
         drawHeader(dc, w, h);
 
         // Three CLI rows.
@@ -234,15 +351,16 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         // Blinking cursor (a no-op while the layout parks it off-screen). Not in always-on: a
         // once-a-minute update can't blink it.
         if (!_lowPower && System.getClockTime().sec % 2 == 0) {
-            dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
+            ink(dc, ACCENT);
             rect(dc, w * CURSOR_X - w * CURSOR_W / 2.0, h * CURSOR_Y, w * CURSOR_W, h * CURSOR_H);
         }
 
-        // VFD build: one screen-aligned mesh over everything, drawn last (no-op otherwise).
-        // Skipped in always-on, like Claude Grid: it would break up the thin outline time.
-        if (!_lowPower) {
-            drawMeshOverlay(dc, w, h, 0, 0, w, h);
-        }
+        // VFD build: one screen-aligned mesh (or the CRT scanlines, per setting) over everything,
+        // drawn last (no-op otherwise). Kept in always-on too, so the face keeps its VFD / CRT
+        // character when the wrist is down: the overlay only DARKENS what is lit (black at partial
+        // alpha over a black background changes nothing), so it adds no lit pixels - it slightly
+        // lowers the burn-in load of the outline time and bars.
+        drawMeshOverlay(dc, w, h, 0, 0, w, h);
     }
 
     //! Always-on on: repaint once in the low-power style (see _lowPower).
@@ -281,7 +399,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
             band[1] = rowsTop - band[0];
         }
         dc.setClip(0, band[0], w, band[1]);
-        dc.setColor(Graphics.COLOR_BLACK, Graphics.COLOR_BLACK);
+        dc.setColor(bg(), bg());          // the theme background (Retro tube is not black)
         dc.fillRectangle(0, band[0], w, band[1]);
         drawHeader(dc, w, h);
         dc.clearClip();
@@ -292,7 +410,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     //! Prompt line, time and date - the three lines the seconds repaint may touch.
     private function drawHeader(dc as Dc, w as Numeric, h as Numeric) as Void {
         // Prompt line (the PromptText setting), accent colour.
-        dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
+        ink(dc, ACCENT);
         text(dc, w * PROMPT_X, h * PROMPT_Y, ft(), _prompt, Graphics.TEXT_JUSTIFY_CENTER);
 
         drawTime(dc, w, h);
@@ -300,7 +418,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         // Date.
         var info = Gregorian.info(Time.now(), Time.FORMAT_MEDIUM);
         var dateStr = info.day_of_week + " " + info.month + " " + info.day.format("%d");
-        dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+        ink(dc, DIM);
         text(dc, w * DATE_X, h * DATE_Y, fs(), dateStr, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
@@ -329,7 +447,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
             var solid = timeFont();
             var full = _showSeconds ? t + ":00" : t;   // same width as any HH:MM:SS (monospace)
             var left = px(w * TIME_X) - dc.getTextWidthInPixels(full, solid) / 2;
-            dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+            ink(dc, VALUE);
             dc.drawText(left, ty, (_fontTimeO != null) ? _fontTimeO : solid, t,
                 Graphics.TEXT_JUSTIFY_LEFT);
             return;
@@ -341,7 +459,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         if (_fontTime != null && drawGlowTime(dc, px(w * TIME_X), ty, font, t)) {
             return;
         }
-        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+        ink(dc, VALUE);
         text(dc, w * TIME_X, ty, font, t, Graphics.TEXT_JUSTIFY_CENTER);
     }
 
@@ -383,14 +501,19 @@ class ClaudeFaceView extends WatchUi.WatchFace {
 
     (:mesh_overlay)
     private var _meshTile = null;
+    (:mesh_overlay)
+    private var _meshIsScan as Boolean = false;   // which tile _meshTile currently holds
 
-    //! Tile the mesh over the given screen rectangle (clipped to it), tiles anchored at the screen
-    //! origin so every call hits the same lattice.
+    //! Tile the overlay over the given screen rectangle (clipped to it), tiles anchored at the
+    //! screen origin so every call hits the same lattice. The overlay is the VFD mesh (rows AND
+    //! columns), or with the Scanlines setting the CRT scanline tile (rows only); only the one in
+    //! use is loaded, and switching the setting swaps it.
     (:mesh_overlay)
     private function drawMeshOverlay(dc as Dc, w as Number, h as Number, x as Number, y as Number,
                                      cw as Number, ch as Number) as Void {
-        if (_meshTile == null) {
-            _meshTile = WatchUi.loadResource(Rez.Drawables.MeshTile);
+        if (_meshTile == null || _meshIsScan != _scanlines) {
+            _meshTile = WatchUi.loadResource(_scanlines ? Rez.Drawables.ScanTile : Rez.Drawables.MeshTile);
+            _meshIsScan = _scanlines;
         }
         var s = (_meshTile as Graphics.BitmapReference).getWidth();
         if (s <= 0) { return; }
@@ -415,7 +538,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var y = h * yf;
         var pct = _pcts[slot];
 
-        dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+        ink(dc, DIM);
         text(dc, w * LABEL_X, y, fs(), _labels[slot], Graphics.TEXT_JUSTIFY_LEFT);
 
         // Bar: integer track, and an integer-width fill measured from the same left edge.
@@ -423,6 +546,12 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var bw = px(w * BAR_W);
         var by = px(y + w * BAR_DY);
         var bh = px(w * BAR_H);
+        // Tube glow: the lit fill's halo goes down first, so the track and fill draw over its
+        // inside and only the soft edge shows around the lit part.
+        if (pct > 0) {
+            var gfw = px(bw * ((pct > 100) ? 100 : pct) / 100.0);
+            haloRect(dc, bx, by, gfw, bh, pct >= 80 ? NEAR_CAP : ACCENT);
+        }
         if (!_lowPower) {   // always-on keeps only the filled part (see _lowPower)
             dc.setColor(TRACK, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(bx, by, bw, bh);
@@ -441,17 +570,129 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         }
 
         // Percentage.
-        dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+        ink(dc, VALUE);
         var pctTxt = (pct >= 0) ? (pct.toString() + "%") : "--";
         text(dc, w * PCT_X, y, fs(), pctTxt, Graphics.TEXT_JUSTIFY_RIGHT);
 
         // Reset time.
         var reset = resetsAt(_resets[slot]);
         if (!reset.equals("")) {
-            dc.setColor(DIM, Graphics.COLOR_TRANSPARENT);
+            ink(dc, DIM);
             text(dc, w * RESET_X, y, fs(), reset, Graphics.TEXT_JUSTIFY_RIGHT);
         }
     }
+    //! Weather line at the top, like Rad Lad's: condition icon + current temperature, centred as a
+    //! pair on WX_X. Icon in the accent colour, temperature in VALUE. Nothing is drawn when the
+    //! watch has no weather yet (no phone sync) rather than a lone "--".
+    private function drawWeather(dc as Dc, w as Numeric, h as Numeric) as Void {
+        var wx = currentWeather();
+        var icon = wx[0];
+        var temp = wx[1];
+        if (temp.equals("")) { return; }
+        var font = fs();
+        var tempW = dc.getTextWidthInPixels(temp, font);
+        var iconW = (!icon.equals("") && _fontIcon != null)
+            ? dc.getTextWidthInPixels(icon, _fontIcon) + WX_GAP : 0;
+        var left = px(w * WX_X) - (iconW + tempW) / 2;
+        var top = px(h * WX_Y);
+        if (iconW > 0) {
+            // The 24 px icon is centred on the 25 px text line: icon line box is ~29 px tall vs
+            // the text's 33, so it sits 2 px lower to line up with the digits.
+            ink(dc, ACCENT);
+            glowText(dc, left, top + 2, _fontIcon as Graphics.FontType, icon);
+            dc.drawText(left, top + 2, _fontIcon as Graphics.FontType, icon, Graphics.TEXT_JUSTIFY_LEFT);
+        }
+        ink(dc, VALUE);
+        glowText(dc, left + iconW, top, font, temp);
+        dc.drawText(left + iconW, top, font, temp, Graphics.TEXT_JUSTIFY_LEFT);
+    }
+
+    //! [icon, temperature] from Weather.getCurrentConditions() - the same logic as Claude Grid:
+    //! live temperature in the watch's unit, and a condition icon with the sun / moon variant by
+    //! whether it's between sunrise and sunset. ["", ""] when there is no weather data.
+    private function currentWeather() as Array<String> {
+        if (!(Toybox has :Weather)) { return ["", ""]; }
+        try {
+            var cc = Weather.getCurrentConditions();
+            if (cc == null) { return ["", ""]; }
+            var temp = "";
+            var tc = cc.temperature;
+            if (tc != null) {
+                var tv = tc.toFloat();
+                if (System.getDeviceSettings().temperatureUnits == System.UNIT_STATUTE) {
+                    tv = tv * 9.0 / 5.0 + 32.0;
+                }
+                temp = Math.round(tv).toNumber().format("%d") + "°";
+            }
+            var icon = "";
+            if (cc.condition != null) {
+                icon = weatherGlyph(cc.condition as Number, isNight(cc)).toChar().toString();
+            }
+            return [icon, temp];
+        } catch (ex) {
+            return ["", ""];
+        }
+    }
+
+    //! True between local sunset and the next sunrise at the observation location; daytime when
+    //! the location or sun times are unknown.
+    private function isNight(cc as Weather.CurrentConditions) as Boolean {
+        var loc = cc.observationLocationPosition;
+        if (loc == null) { return false; }
+        var now = Time.now();
+        var rise = Weather.getSunrise(loc, now);
+        var set = Weather.getSunset(loc, now);
+        if (rise == null || set == null) { return false; }
+        return now.lessThan(rise) || now.greaterThan(set);
+    }
+
+    //! Weather condition -> glyph in stm_icon (Claude Grid's cg_icon; keep the two in step).
+    //! 0xE001 / 0xE002 are the composited cloud+sun / cloud+moon.
+    private function weatherGlyph(c as Number, night as Boolean) as Number {
+        if (c == Weather.CONDITION_CLEAR || c == Weather.CONDITION_FAIR
+         || c == Weather.CONDITION_MOSTLY_CLEAR) {
+            return night ? 0xeaf8 : 0xeb30;                      // moon / sun
+        }
+        if (c == Weather.CONDITION_PARTLY_CLOUDY || c == Weather.CONDITION_PARTLY_CLEAR
+         || c == Weather.CONDITION_THIN_CLOUDS) {
+            return night ? 0xE002 : 0xE001;                      // cloud+moon / cloud+sun
+        }
+        if (c == Weather.CONDITION_THUNDERSTORMS || c == Weather.CONDITION_SCATTERED_THUNDERSTORMS
+         || c == Weather.CONDITION_CHANCE_OF_THUNDERSTORMS || c == Weather.CONDITION_HURRICANE
+         || c == Weather.CONDITION_TROPICAL_STORM || c == Weather.CONDITION_TORNADO) {
+            return 0xea74;
+        }
+        if (c == Weather.CONDITION_SNOW || c == Weather.CONDITION_LIGHT_SNOW
+         || c == Weather.CONDITION_HEAVY_SNOW || c == Weather.CONDITION_FLURRIES
+         || c == Weather.CONDITION_CHANCE_OF_SNOW || c == Weather.CONDITION_CLOUDY_CHANCE_OF_SNOW
+         || c == Weather.CONDITION_WINTRY_MIX || c == Weather.CONDITION_RAIN_SNOW
+         || c == Weather.CONDITION_LIGHT_RAIN_SNOW || c == Weather.CONDITION_HEAVY_RAIN_SNOW
+         || c == Weather.CONDITION_CHANCE_OF_RAIN_SNOW || c == Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN_SNOW
+         || c == Weather.CONDITION_SLEET || c == Weather.CONDITION_ICE
+         || c == Weather.CONDITION_ICE_SNOW || c == Weather.CONDITION_HAIL
+         || c == Weather.CONDITION_FREEZING_RAIN) {
+            return 0xea73;
+        }
+        if (c == Weather.CONDITION_RAIN || c == Weather.CONDITION_LIGHT_RAIN
+         || c == Weather.CONDITION_HEAVY_RAIN || c == Weather.CONDITION_SHOWERS
+         || c == Weather.CONDITION_LIGHT_SHOWERS || c == Weather.CONDITION_HEAVY_SHOWERS
+         || c == Weather.CONDITION_SCATTERED_SHOWERS || c == Weather.CONDITION_CHANCE_OF_SHOWERS
+         || c == Weather.CONDITION_DRIZZLE || c == Weather.CONDITION_CLOUDY_CHANCE_OF_RAIN
+         || c == Weather.CONDITION_UNKNOWN_PRECIPITATION) {
+            return 0xea72;
+        }
+        if (c == Weather.CONDITION_FOG || c == Weather.CONDITION_HAZY || c == Weather.CONDITION_HAZE
+         || c == Weather.CONDITION_MIST || c == Weather.CONDITION_SMOKE || c == Weather.CONDITION_DUST
+         || c == Weather.CONDITION_SAND || c == Weather.CONDITION_SANDSTORM
+         || c == Weather.CONDITION_VOLCANIC_ASH) {
+            return 0xecd9;
+        }
+        if (c == Weather.CONDITION_WINDY || c == Weather.CONDITION_SQUALL) {
+            return 0xec34;
+        }
+        return 0xea76; // cloud: MOSTLY_CLOUDY, CLOUDY (overcast) and anything unknown
+    }
+
     //! A hollow rectangle: a `t`-px border drawn INSIDE (x, y, w, h), all edges on whole pixels.
     //! Four fills rather than drawRectangle so the stroke width is exact and nothing is
     //! anti-aliased. Too small to leave a hollow (e.g. a 1 % bar) -> filled solid instead.
@@ -488,6 +729,11 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         if (lit < 0) { lit = 0; }
         var on = (pct <= BATT_LOW) ? NEAR_CAP : ACCENT;
 
+        // Tube glow: every lit segment's halo first, so neighbouring halos merge in the gaps and no
+        // halo is drawn over a segment.
+        for (var i = 0; i < lit; i++) {
+            haloRect(dc, x0 + i * (sw + gap), y0, sw, bh, on);
+        }
         for (var i = 0; i < BATT_SEGS; i++) {
             if (i >= lit && _lowPower) { break; }   // always-on: lit segments only
             dc.setColor(i < lit ? on : TRACK, Graphics.COLOR_TRANSPARENT);
