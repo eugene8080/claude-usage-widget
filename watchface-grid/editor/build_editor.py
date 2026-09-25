@@ -81,7 +81,16 @@ HTML = r"""<!doctype html>
 <style>
   body{margin:0;background:#141414;color:#ddd;font-family:ui-sans-serif,Segoe UI,Roboto,sans-serif;display:flex;gap:22px;padding:18px;flex-wrap:wrap;}
   h1{font-size:15px;color:#F2A98C;margin:0 0 4px;} p.hint{color:#8a8a8a;font-size:12px;margin:0 0 10px;max-width:470px;line-height:1.5;}
-  canvas{border-radius:50%;box-shadow:0 0 0 10px #2a2a2a,0 0 0 12px #000;touch-action:none;cursor:grab;}
+  canvas{border-radius:50%;box-shadow:0 0 0 10px #2a2a2a,0 0 0 12px #000;touch-action:none;cursor:grab;display:block;}
+  /* Centre-line ticks on the grey bezel ring (the canvas box-shadow): 2 px white marks
+     at 12 / 3 / 6 / 9 o'clock so the vertical and horizontal centre lines are visible.
+     Outside the canvas and click-through, so they never affect drawing or hit tests. */
+  .dial{position:relative;display:inline-block;}
+  .dial .tk{position:absolute;background:#fff;pointer-events:none;}
+  .tk.t{left:calc(50% - 1px);top:-10px;width:2px;height:10px;}
+  .tk.b{left:calc(50% - 1px);bottom:-10px;width:2px;height:10px;}
+  .tk.l{top:calc(50% - 1px);left:-10px;width:10px;height:2px;}
+  .tk.r{top:calc(50% - 1px);right:-10px;width:10px;height:2px;}
   .side{flex:1 1 340px;min-width:320px;max-width:450px;}
   .panel{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:10px;padding:12px 15px;margin-bottom:12px;}
   .panel h2{font-size:13px;color:#E95625;margin:0 0 10px;text-transform:uppercase;letter-spacing:.5px;}
@@ -100,7 +109,7 @@ HTML = r"""<!doctype html>
     <p class="hint"><b>Click</b> a field (or the top arc) to select it. Set its <b>complication</b> and
       sizes; <b>drag</b> to move (snaps to align) or nudge with the <b>arrow keys</b> (Shift = 10 px); <b>Tab</b> / <b>Shift+Tab</b> selects the next / previous.
       Colours take <b>hex</b>. <b>Copy</b> the block back to me.</p>
-    <canvas id="c" width="454" height="454"></canvas>
+    <div class="dial"><canvas id="c" width="454" height="454"></canvas><i class="tk t"></i><i class="tk r"></i><i class="tk b"></i><i class="tk l"></i></div>
   </div>
   <div class="side">
     <div class="panel">
