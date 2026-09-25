@@ -2,6 +2,10 @@ project.manifest = manifest.xml
 
 base.sourcePath = source
 base.resourcePath = resources
+# Font-drawn time, no mesh overlay. The experiment builds (tools/build_sharpness_variants.py)
+# rewrite this: glow digits exclude font_time and add source-glow/ + a resources-glow*/ folder;
+# the full-face VFD mesh excludes plain_overlay and adds resources-mesh/.
+base.excludeAnnotations = glow_time;mesh_overlay
 
 fenix847mm.resourcePath = $(base.resourcePath);resources-round-454x454
 fenix8pro47mm.resourcePath = $(base.resourcePath);resources-round-454x454
