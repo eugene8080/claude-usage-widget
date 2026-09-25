@@ -11,8 +11,8 @@ class UsageWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
-        // First widget added: start the periodic refresh and fetch immediately.
-        RefreshScheduler.ensurePeriodic(context)
+        // First widget added: start the periodic refresh and fetch immediately
+        // (refreshNow also (re)schedules the periodic work).
         RefreshScheduler.refreshNow(context)
     }
 
