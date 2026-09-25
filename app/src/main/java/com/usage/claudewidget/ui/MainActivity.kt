@@ -1,12 +1,8 @@
 package com.usage.claudewidget.ui
 
-import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.PowerManager
-import android.provider.Settings
 import android.text.format.DateUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -17,7 +13,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.TextButton
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -94,6 +95,36 @@ private fun SetupScreen() {
     var debug by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
 
+    // Background-activity prompt. Re-evaluated every time the screen resumes, which is how
+    // it notices the user coming back from the system settings it sent them to.
+    var bg by remember { mutableStateOf(BackgroundAccess.status(context, storage)) }
+    var showBgDialog by remember { mutableStateOf(storage.isLoggedIn && bg.shouldPrompt) }
+    LifecycleResumeEffect(Unit) {
+        bg = BackgroundAccess.status(context, storage)
+        status = describe(storage)
+        onPauseOrDispose { }
+    }
+
+    if (showBgDialog) {
+        BackgroundDialog(
+            status = bg,
+            garminInstalled = remember {
+                BackgroundAccess.isInstalled(context, BackgroundAccess.GARMIN_CONNECT_PACKAGE)
+            },
+            onBatteryExemption = { BackgroundAccess.requestBatteryExemption(context) },
+            onAppInfo = { BackgroundAccess.openAppInfo(context) },
+            onGarminInfo = {
+                BackgroundAccess.openAppInfo(context, BackgroundAccess.GARMIN_CONNECT_PACKAGE)
+            },
+            onDone = {
+                storage.backgroundHelpAckAt = System.currentTimeMillis()
+                bg = BackgroundAccess.status(context, storage)
+                showBgDialog = false
+            },
+            onLater = { showBgDialog = false },
+        )
+    }
+
     val loginLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) {
@@ -150,12 +181,20 @@ private fun SetupScreen() {
                 } finally {
                     busy = false
                     status = describe(storage)
+                    // A send the phone cut off is exactly what the background prompt fixes.
+                    bg = BackgroundAccess.status(context, storage)
+                    if (bg.stoppedSinceAck) showBgDialog = true
                 }
             }
         }) { Text("Test fetch now") }
 
-        OutlinedButton(onClick = { requestBatteryExemption(context) }) {
-            Text("Disable battery optimization")
+        // Opens the same prompt on demand; it was a bare "Disable battery optimization"
+        // button, which covered only Android's layer and not the manufacturer's.
+        OutlinedButton(onClick = {
+            bg = BackgroundAccess.status(context, storage)
+            showBgDialog = true
+        }) {
+            Text(if (bg.batteryExempt && !bg.stoppedSinceAck) "Background settings" else "Background settings ⚠")
         }
 
         if (debug.isNotBlank()) {
@@ -193,13 +232,76 @@ private fun ago(epochMs: Long): String = DateUtils.getRelativeTimeSpanString(
     epochMs, System.currentTimeMillis(), DateUtils.MINUTE_IN_MILLIS
 ).toString()
 
-private fun requestBatteryExemption(context: Context) {
-    val pm = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    if (!pm.isIgnoringBatteryOptimizations(context.packageName)) {
-        val intent = Intent(
-            Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
-            Uri.parse("package:${context.packageName}")
-        )
-        context.startActivity(intent)
-    }
+/**
+ * "Keep Claude Usage running" - what this phone must allow for the 15-minute refresh and
+ * the watch send, with a button for each setting the app can open.
+ *
+ * Android's battery exemption is checked and requested directly. A manufacturer's own
+ * background switch (ColorOS "Allow background activity") cannot be read by an app, so for
+ * that the dialog names the exact path, opens the App info page it lives under, and relies
+ * on the user's "Done" - re-appearing only if a later watch send is still stopped.
+ */
+@androidx.compose.runtime.Composable
+private fun BackgroundDialog(
+    status: BackgroundAccess.Status,
+    garminInstalled: Boolean,
+    onBatteryExemption: () -> Unit,
+    onAppInfo: () -> Unit,
+    onGarminInfo: () -> Unit,
+    onDone: () -> Unit,
+    onLater: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onLater,
+        title = { Text("Keep Claude Usage running") },
+        text = {
+            Column(
+                modifier = Modifier.verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (status.stoppedSinceAck) {
+                    Text(
+                        "Your phone stopped the last watch update before it finished.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                Text(
+                    "The widget refreshes every 15 minutes and updates your Garmin watch in " +
+                        "the background. Your phone has to allow that:",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+
+                // 1. Android's own layer - readable, so show its state.
+                Text(
+                    if (status.batteryExempt) "✓ Battery optimisation is off for Claude Usage."
+                    else "1. Turn off battery optimisation for Claude Usage.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                if (!status.batteryExempt) {
+                    Button(onClick = onBatteryExemption) { Text("Allow") }
+                }
+
+                // 2. The manufacturer's layer - not readable, so give the exact path.
+                Text(
+                    if (status.colorOs) {
+                        "${if (status.batteryExempt) "" else "2. "}On this phone (ColorOS): " +
+                            "App info → Battery usage → Allow background activity — for " +
+                            "Claude Usage and for Garmin Connect."
+                    } else {
+                        "${if (status.batteryExempt) "" else "2. "}If your phone has its own " +
+                            "battery manager (Samsung, Xiaomi, OnePlus, Oppo…), allow Claude " +
+                            "Usage and Garmin Connect to run in the background there too."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                OutlinedButton(onClick = onAppInfo) { Text("Claude Usage app info") }
+                if (garminInstalled) {
+                    OutlinedButton(onClick = onGarminInfo) { Text("Garmin Connect app info") }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDone) { Text("Done") } },
+        dismissButton = { TextButton(onClick = onLater) { Text("Later") } },
+    )
 }
