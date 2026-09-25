@@ -93,10 +93,11 @@ is why the watch app must be installed (and opened once) for the faces to show C
 ### Claude Terminal
 
 - The three Claude meters as CLI rows (`5H`, `1W`, model) with bars, percentages and absolute
-  reset times, under a `claude ~ %` prompt and the time.
-- Settings (Garmin Connect): **Show seconds**, and the **prompt text** — make the top line say
-  whatever you like.
-- An optional VFD build (glowing time + full-face mesh) — see its README.
+  reset times, under an `eugene@tactix ~ $` prompt and the time, in IBM Plex Mono on the Night Owl
+  palette.
+- Settings (Garmin Connect): **Show seconds** (on by default), and the **prompt text** — make the
+  top line say whatever you like.
+- VFD style by default (glowing time + full-face mesh); the MIP Solar models get the plain face.
 
 ### Layout editors
 

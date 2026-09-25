@@ -1,7 +1,7 @@
 <properties>
     <!-- Toggled from the watch face settings; read in ClaudeFaceView.readSettings(). -->
-    <property id="ShowSeconds" type="boolean">false</property>
+    <property id="ShowSeconds" type="boolean">true</property>
     <!-- The prompt line's text. Default = the layout editor's Prompt text; editable in Garmin
          Connect (settings.xml) without rebuilding the face. -->
-    <property id="PromptText" type="string">claude ~ %</property>
+    <property id="PromptText" type="string">eugene@tactix ~ $</property>
 </properties>
