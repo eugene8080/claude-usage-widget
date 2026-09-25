@@ -4,7 +4,9 @@ A terminal/CLI-styled watch face for fenix 8 class watches (incl. tactix 8), mod
 "Agentic Pro" look. Shows a prompt line, the time, the date, and the three Claude usage meters
 (5H / 1W / model) as CLI rows with bars, percentages, and reset times, plus a segmented battery
 bar (the straight counterpart of Claude Grid's battery arc), in IBM Plex Mono on the Night Owl
-palette, with a glowing VFD time.
+palette, with a glowing VFD time. In always-on (low power) the time becomes a 2 px outline HH:MM
+(`stm_time_o`, from `tools/build_fonts_terminal.py`) and the mesh, seconds and grey tracks go, as
+on Claude Grid.
 
 Updated: 2026-09-25
 

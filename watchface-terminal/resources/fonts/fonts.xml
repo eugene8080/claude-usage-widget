@@ -1,10 +1,12 @@
 <fonts>
     <!-- IBM Plex Mono, generated from the TTF into CIQ bitmap fonts by tools/build_fonts_terminal.py.
          Sizes are the layout editor's: STMono = prompt (26px), STMonoSmall = date + meter rows
-         (25px), both full printable ASCII; STMonoTime = the time (70px), digits + colon only.
+         (25px), both full printable ASCII; STMonoTime = the time (70px), digits + colon only;
+         STMonoTimeOutline = the same time as 2 px hollow outlines, for always-on (low power).
          antialias="true" is REQUIRED - without it CIQ thresholds the atlas alpha to 1-bit and the
          text renders jagged; with it the smooth glyph edges are preserved on-device. -->
     <font id="STMono"      antialias="true" filename="stm_text.fnt" />
     <font id="STMonoSmall" antialias="true" filename="stm_small.fnt" />
     <font id="STMonoTime"  antialias="true" filename="stm_time.fnt" />
+    <font id="STMonoTimeOutline" antialias="true" filename="stm_time_o.fnt" />
 </fonts>

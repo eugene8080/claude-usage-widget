@@ -12,7 +12,8 @@ import Toybox.WatchUi;
 //!
 //! Layout comes straight from the HTML layout editor: a prompt line, the big time, the date, then
 //! three CLI-style rows (5H / 1W / model) each with a bar, percentage and reset time, a segmented
-//! battery bar, and a blinking cursor. Night Owl colours on black, in IBM Plex Mono.
+//! battery bar, and a blinking cursor. Night Owl colours on black, in IBM Plex Mono. In always-on
+//! the time drops to a thin outline HH:MM and the grey tracks and mesh go (see _lowPower).
 //!
 //! The values come from the published complications. We can't construct a custom complication's Id
 //! directly (its identity is an internal UUID), so onShow ENUMERATES the available complications,
@@ -66,6 +67,14 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     private var _fontText as Graphics.FontType?;
     private var _fontSmall as Graphics.FontType?;
     private var _fontTime as Graphics.FontType?;
+    private var _fontTimeO as Graphics.FontType?;   // 2 px hollow outline time - always-on
+
+    // Always-on (low power), the same scheme as Claude Grid: onEnterSleep / onExitSleep flip it.
+    // The AMOLED burn-in budget wants few, thin lit pixels, so while it is set the face draws
+    // the time as HH:MM in the hollow outline font (no glow bitmaps, no seconds, no per-second
+    // repaint), drops the full-face mesh and every grey track (meter bar backgrounds, unlit
+    // battery segments), and keeps only the text and the filled bar/battery portions.
+    private var _lowPower as Boolean = false;
 
     public function initialize() {
         WatchFace.initialize();
@@ -75,6 +84,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         _fontText = WatchUi.loadResource(Rez.Fonts.STMono) as Graphics.FontType;
         _fontSmall = WatchUi.loadResource(Rez.Fonts.STMonoSmall) as Graphics.FontType;
         _fontTime = WatchUi.loadResource(Rez.Fonts.STMonoTime) as Graphics.FontType;
+        _fontTimeO = WatchUi.loadResource(Rez.Fonts.STMonoTimeOutline) as Graphics.FontType;
     }
 
     //! The prompt font (26px), falling back to the system font if the resource ever fails.
@@ -88,6 +98,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     }
 
     public function onShow() as Void {
+        _lowPower = false;
         readSettings();
         if (!(Toybox has :Complications)) {
             return;
@@ -217,14 +228,30 @@ class ClaudeFaceView extends WatchUi.WatchFace {
 
         drawBattery(dc, w, h);
 
-        // Blinking cursor (a no-op while the layout parks it off-screen).
-        if (System.getClockTime().sec % 2 == 0) {
+        // Blinking cursor (a no-op while the layout parks it off-screen). Not in always-on: a
+        // once-a-minute update can't blink it.
+        if (!_lowPower && System.getClockTime().sec % 2 == 0) {
             dc.setColor(ACCENT, Graphics.COLOR_TRANSPARENT);
             rect(dc, w * CURSOR_X - w * CURSOR_W / 2.0, h * CURSOR_Y, w * CURSOR_W, h * CURSOR_H);
         }
 
         // VFD build: one screen-aligned mesh over everything, drawn last (no-op otherwise).
-        drawMeshOverlay(dc, w, h, 0, 0, w, h);
+        // Skipped in always-on, like Claude Grid: it would break up the thin outline time.
+        if (!_lowPower) {
+            drawMeshOverlay(dc, w, h, 0, 0, w, h);
+        }
+    }
+
+    //! Always-on on: repaint once in the low-power style (see _lowPower).
+    public function onEnterSleep() as Void {
+        _lowPower = true;
+        WatchUi.requestUpdate();
+    }
+
+    //! Back to high power: full style, and seconds resume with the next partial update.
+    public function onExitSleep() as Void {
+        _lowPower = false;
+        WatchUi.requestUpdate();
     }
 
     //! Seconds tick here when the device allows partial updates; onUpdate handles the rest.
@@ -236,7 +263,8 @@ class ClaudeFaceView extends WatchUi.WatchFace {
     //! every pixel in the band is then painted from black exactly once, as in a full update (text
     //! drawn over its own anti-aliased edges without a blank would darken them each second).
     public function onPartialUpdate(dc as Dc) as Void {
-        if (!_showSeconds) {
+        // No seconds in always-on (the outline time is HH:MM), so nothing to tick.
+        if (!_showSeconds || _lowPower) {
             return;
         }
         var w = dc.getWidth();
@@ -287,10 +315,19 @@ class ClaudeFaceView extends WatchUi.WatchFace {
             if (hour == 0) { hour = 12; }
         }
         var t = hour.format("%02d") + ":" + clock.min.format("%02d");
+        var ty = px(h * TIME_Y);
+        if (_lowPower) {
+            // Always-on: HH:MM in the hollow outline font, never the glow bitmaps (a lit bloom
+            // would blow the AMOLED burn-in budget). Same top as the solid time - the outline
+            // font shares its line metrics - so the time doesn't jump on entering sleep.
+            dc.setColor(VALUE, Graphics.COLOR_TRANSPARENT);
+            text(dc, w * TIME_X, ty, (_fontTimeO != null) ? _fontTimeO : timeFont(), t,
+                Graphics.TEXT_JUSTIFY_CENTER);
+            return;
+        }
         if (_showSeconds) {
             t += ":" + clock.sec.format("%02d");
         }
-        var ty = px(h * TIME_Y);
         var font = timeFont();
         if (_fontTime != null && drawGlowTime(dc, px(w * TIME_X), ty, font, t)) {
             return;
@@ -377,8 +414,10 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var bw = px(w * BAR_W);
         var by = px(y + w * BAR_DY);
         var bh = px(w * BAR_H);
-        dc.setColor(TRACK, Graphics.COLOR_TRANSPARENT);
-        dc.fillRectangle(bx, by, bw, bh);
+        if (!_lowPower) {   // always-on keeps only the filled part (see _lowPower)
+            dc.setColor(TRACK, Graphics.COLOR_TRANSPARENT);
+            dc.fillRectangle(bx, by, bw, bh);
+        }
         if (pct >= 0) {
             var clamped = (pct > 100) ? 100 : pct;
             var fw = px(bw * clamped / 100.0);
@@ -422,6 +461,7 @@ class ClaudeFaceView extends WatchUi.WatchFace {
         var on = (pct <= BATT_LOW) ? NEAR_CAP : ACCENT;
 
         for (var i = 0; i < BATT_SEGS; i++) {
+            if (i >= lit && _lowPower) { break; }   // always-on: lit segments only
             dc.setColor(i < lit ? on : TRACK, Graphics.COLOR_TRANSPARENT);
             dc.fillRectangle(x0 + i * (sw + gap), y0, sw, bh);
         }
