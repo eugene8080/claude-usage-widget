@@ -41,8 +41,8 @@ class ClaudeUsageView extends WatchUi.View {
         dc.drawText(cx, h * 0.10, Graphics.FONT_XTINY, "Claude usage",
             Graphics.TEXT_JUSTIFY_CENTER);
 
-        // Rows are spaced off the display height rather than fixed pixels, because the five
-        // supported devices span 260x260 to 454x454.
+        // Rows are spaced off the display height rather than fixed pixels, because the
+        // supported devices span 416x416 to 454x454.
         var rowH = h * 0.17;
         var firstY = h * 0.24;
         var barW = w * 0.54;

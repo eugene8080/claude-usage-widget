@@ -61,7 +61,7 @@ Then continue with first-run setup below.
 
 ## ⌚ On your Garmin watch
 
-<sub>Updated: 2026-09-25 · Built and tested on a tactix 8 (the `fenix847mm` Connect IQ profile); also builds for fēnix 8 43 mm, fēnix 8 Pro 47 mm and fēnix 8 Solar 47 / 51 mm.</sub>
+<sub>Updated: 2026-09-25 · Built and tested on a tactix 8 (the `fenix847mm` Connect IQ profile); also builds for fēnix 8 43 mm and fēnix 8 Pro 47 mm (the Solar models are not targeted).</sub>
 
 Three Connect IQ projects put the same usage numbers on a fēnix 8 / tactix 8 class watch:
 
@@ -97,7 +97,7 @@ is why the watch app must be installed (and opened once) for the faces to show C
   palette.
 - Settings (Garmin Connect): **Show seconds** (on by default), and the **prompt text** — make the
   top line say whatever you like.
-- VFD style by default (glowing time + full-face mesh); the MIP Solar models get the plain face.
+- VFD style by default (glowing time + full-face mesh).
 
 ### Layout editors
 

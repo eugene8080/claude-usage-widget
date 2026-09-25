@@ -22,9 +22,8 @@ and the watch-app opened once so its 5-minute background publish is registered.
 ## Settings (Garmin Connect)
 
 - **Show seconds** (on by default) - the time shows `HH:MM:SS`. In high-power mode the whole
-  face redraws every second. In low-power mode the seconds tick through `onPartialUpdate`, but
-  only on screens that allow it: the MIP Solar models do, while the AMOLED tactix 8 holds the
-  last second until you raise your wrist.
+  face redraws every second. In always-on (low-power) mode the AMOLED tactix 8 doesn't call
+  `onPartialUpdate`, so it holds the last second until you raise your wrist.
 - **Prompt text** - the top line (default `eugene@tactix ~ $`, up to 24 characters). The layout
   editor's Prompt text is the default; the setting overrides it without a rebuild.
 - A face that was already installed keeps its **stored** settings when you sideload a new build.
@@ -47,15 +46,14 @@ and the watch-app opened once so its 5-minute background publish is registered.
   ```
 
   To build the plain face, switch the three `base.*` lines in `monkey.jungle` as its comment shows.
-  The MIP **Solar** models always get the plain face. Their 64-colour screens have no alpha
-  blending, so the glow's soft alpha would draw as solid blobs.
 - **Seconds repaint.** `onPartialUpdate` clips to the time's real band. In the VFD build that is
   the glow cell (`GlowTimeMetrics.Y0/H`); in the plain build it is the time font's line box. The
   band is capped at the first meter row. Inside the clip it blanks the band and redraws the
   prompt, time and date in full-update order, so a descender or a line box that crosses the band
   is never cut off or double-drawn.
-- **Screen sizes.** The fonts are fixed pixel sizes laid out for the 454 px tactix 8. The 416 px
-  fenix 8 43mm fits, but on the 260/280 px Solar screens the prompt and the time overrun the bezel.
+- **Targets.** fenix 8 47mm / 51mm (= tactix 8), fenix 8 Pro 47mm and fenix 8 43mm - all AMOLED.
+  The fonts are fixed pixel sizes laid out for the 454 px tactix 8; the 416 px 43mm fits too.
+  The fenix 8 Solar models were dropped (not needed; their MIP screens can't show the glow).
 
 ## Fonts
 
