@@ -11,8 +11,15 @@ embedded as images, only the mono web-fonts load from Google Fonts). Then:
 - Set its **complication** (dropdown, incl. the three Claude meters), and its **ring radius /
   number px / symbol px** — all **absolute pixels**, so you can match sizes across fields.
 - **Drag** to move, or nudge the selected element with the **arrow keys** (1 px; **Shift** = 10 px;
-  the battery arc moves radially, the week strip vertically). **Snap to align** shows guides; **Mirror left/right** keeps the 02/04/06 (left)
+  the battery arc moves radially, the week strip vertically). **Tab** / **Shift+Tab** selects the
+  next / previous element in reading order (top to bottom, left to right). **Snap to align** shows guides; **Mirror left/right** keeps the 02/04/06 (left)
   and 03/05/08 (right) columns symmetric in position + size.
+- **Theme** (top of Watch colours) sets all nine colours at once: **Claude** (the face's palette),
+  **IV-22** (VFD teal, measured from the IV-22 tube art), and the VS Code themes from porttracker's
+  charts: GitHub Dark, One Dark, Dracula, Monokai, **Nord**, Tokyo Night, Solarized, Synthwave,
+  Night Owl. Editing any single colour switches it to **Custom**. The background stays black.
+- The font menu has a **Dot matrix / pixel / LED** group (Doto, Handjet, the Bitcount family,
+  DotGothic16, Press Start 2P, Tiny5, Workbench, Sixtyfour, VT323, ...) - all with fixed-width digits.
 - Colours take **hex**; the **time** has independent **hour** and **minute** colours, and in VFD
   style independent **hour glow** / **minute glow** colours. Apply them to the face with
   `python ../tools/build_glow_digits.py --hour-glow <hex> --minute-glow <hex>` (default minute
@@ -31,7 +38,10 @@ embedded as images, only the mono web-fonts load from Google Fonts). Then:
 - Complications preview what the face actually draws: weather = condition icon + temperature,
   high/low = two right-aligned lines, VO2 max run/bike and training status = icons (status as a
   short code such as PROD), day of week / date = text only, Quote Glance = price only.
-- Pick a **mono font** (43 options) — every digit column lines up.
+- Pick a font from the grouped menu - Modern / neo-grotesque, Coding / humanist, Technical /
+  squared, Typewriter / serif, Display / novelty, Dot matrix / pixel / LED (56 in all) - every
+  digit column lines up. A new font replaces the old one only once it has loaded (no flash of a
+  fallback face), and the rest are prefetched in the background so scrolling the menu is quick.
 
 Hit **Copy settings** and paste the block back; it lists every element's position (fractions of
 the 454 px screen), absolute sizes, complication, colours, arc and font.
