@@ -65,6 +65,10 @@ Y_CALIBRATION = 1
 HOUR_TOP = (255, 255, 255)
 HOUR_BOT = (242, 229, 220)       # faint warm fall-off so the white hour has some depth
 HOUR_GLOW = (255, 196, 164)      # peach bloom - ties the white hour into the orange palette
+# Minute bloom: None = each row glows in its own gradient colour (orange above, red below); a
+# fixed (r, g, b) overrides it. Both are settable with --hour-glow / --minute-glow (hex), which is
+# what the layout editor's "Hour glow" / "Minute glow" pickers map to.
+MINUTE_GLOW = None
 GRAD_A = (0xFF, 0x92, 0x55)      # Gradient 1 (warm orange) - top of the minute
 GRAD_B = (0xFF, 0x3C, 0x3B)      # Gradient 2 (hot red)     - bottom of the minute
 
@@ -107,6 +111,14 @@ MESH_PITCH = 3
 MESH_DIM = 0.30
 MESH_TILE = 114          # multiple of MESH_PITCH, so tiles join seamlessly; 4x4 tiles cover 454
 MESH_DIR = GRID / "resources-mesh" / "drawables"
+
+
+def hex_rgb(s: str) -> tuple[int, int, int]:
+    """"#ffc4a4" / "ffc4a4" -> (255, 196, 164); rejects anything that isn't 6 hex digits."""
+    h = s.strip().lstrip("#")
+    if len(h) != 6 or any(c not in "0123456789abcdefABCDEF" for c in h):
+        raise ValueError("not a 6-digit hex colour: %r" % s)
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
 
 
 def parse_fnt(path: Path) -> tuple[int, dict[str, Glyph]]:
@@ -219,8 +231,11 @@ def render(kind: str, mask: np.ndarray, line_h: int, y0: int, st: Style) -> Imag
         else:
             # The minute glows in its own row colour (orange above, red below). The un-meshed
             # face colour feeds the bloom so the mesh doesn't dim the halo.
-            base = np.broadcast_to(face_colour(kind, rows, line_h, y0, True), (h, w, 3))
-            src_p = base * mask[..., None]
+            if MINUTE_GLOW is not None:
+                src_p = np.array(MINUTE_GLOW, dtype=np.float64) / 255.0 * mask[..., None]
+            else:
+                base = np.broadcast_to(face_colour(kind, rows, line_h, y0, True), (h, w, 3))
+                src_p = base * mask[..., None]
         def bloom(sig: float, gain: float) -> tuple[np.ndarray, np.ndarray]:
             bp = np.stack([gaussian_filter(src_p[..., c], sig) for c in range(3)], axis=-1)
             ba = gaussian_filter(mask, sig)
@@ -329,7 +344,19 @@ def preview(imgs: dict[str, Image.Image], line_h: int, adv: int,
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--styles", default="vfd", help="comma-separated: vfd, flat")
+    ap.add_argument("--hour-glow", default=None, help="hour bloom colour as hex, e.g. ffc4a4 (default peach)")
+    ap.add_argument("--minute-glow", default=None,
+                    help="minute bloom colour as hex (default: follow the minute's own gradient)")
     args = ap.parse_args()
+    global HOUR_GLOW, MINUTE_GLOW
+    try:
+        if args.hour_glow:
+            HOUR_GLOW = hex_rgb(args.hour_glow)
+        if args.minute_glow:
+            MINUTE_GLOW = hex_rgb(args.minute_glow)
+    except ValueError as ex:
+        log.error("%s", ex)
+        return 2
     logging.basicConfig(level=logging.INFO, format="%(message)s")
 
     names = [s.strip() for s in args.styles.split(",") if s.strip()]
